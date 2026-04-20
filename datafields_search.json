@@ -1,0 +1,583 @@
+{
+  "reference": {
+    "count": 10,
+    "next": null,
+    "previous": null,
+    "results": [
+      {
+        "id": "about-close-location-value",
+        "title": "About Close Location Value",
+        "highlights": [
+          {
+            "section": "title",
+            "content": [
+              "About <em>Close</em> Location Value"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "ts_delta",
+        "title": "ts_delta",
+        "highlights": []
+      },
+      {
+        "id": "ts_corr",
+        "title": "ts_corr",
+        "highlights": []
+      },
+      {
+        "id": "about-momentum-effect",
+        "title": "About Momentum Effect",
+        "highlights": []
+      },
+      {
+        "id": "group_neutralize",
+        "title": "group_neutralize",
+        "highlights": []
+      },
+      {
+        "id": "ts_delay",
+        "title": "ts_delay",
+        "highlights": []
+      },
+      {
+        "id": "ts_decay_linear",
+        "title": "ts_decay_linear",
+        "highlights": []
+      },
+      {
+        "id": "group_mean",
+        "title": "group_mean",
+        "highlights": []
+      },
+      {
+        "id": "sign",
+        "title": "sign",
+        "highlights": []
+      },
+      {
+        "id": "settings",
+        "title": "Settings",
+        "highlights": []
+      }
+    ]
+  },
+  "tutorialPage": {
+    "count": 10,
+    "next": null,
+    "previous": null,
+    "results": [
+      {
+        "id": "getting-started-d0",
+        "title": "D0",
+        "highlights": [],
+        "tutorial": "advanced-topics"
+      },
+      {
+        "id": "intermediate-pack-part-2",
+        "title": "Intermediate Pack - Improve your Alpha [2/2]",
+        "highlights": [],
+        "tutorial": "discover-brain"
+      },
+      {
+        "id": "data",
+        "title": "Understanding Data in BRAIN: Key Concepts and Tips",
+        "highlights": [],
+        "tutorial": "understanding-data"
+      },
+      {
+        "id": "china-region-consultants",
+        "title": "Getting Started: China Research for Consultants [Gold]",
+        "highlights": [],
+        "tutorial": "regions-and-universes"
+      },
+      {
+        "id": "another-sample-alpha",
+        "title": "Simulate your second Alpha\ud83e\udd49",
+        "highlights": [],
+        "tutorial": "create-alphas"
+      },
+      {
+        "id": "alpha-submission",
+        "title": "Clear these tests before submitting an Alpha",
+        "highlights": [],
+        "tutorial": "interpret-results"
+      },
+      {
+        "id": "simulation-settings",
+        "title": "How to choose the Simulation Settings",
+        "highlights": [],
+        "tutorial": "create-alphas"
+      },
+      {
+        "id": "fast-d1-documentation",
+        "title": "Fast D1 Documentation",
+        "highlights": [],
+        "tutorial": "advanced-topics"
+      },
+      {
+        "id": "parameters-simulation-results",
+        "title": "Parameters in the Simulation results",
+        "highlights": [],
+        "tutorial": "interpret-results"
+      },
+      {
+        "id": "multi-alpha-simulation",
+        "title": "Consultant Simulation Features",
+        "highlights": [],
+        "tutorial": "consultant-information"
+      }
+    ]
+  },
+  "video": {
+    "count": 10,
+    "next": null,
+    "previous": null,
+    "results": [
+      {
+        "id": "ts-operators-max-min",
+        "category": "Operators",
+        "title": "Max & Min Operators",
+        "uid": "WSgAWSsYKsBTZ9m2oSLxRz",
+        "numericalId": 1997678,
+        "language": "en",
+        "sequence": 4,
+        "source": "VidYard",
+        "description": "This video talks about how an alpha can be developed employing a mean reversion method that uses variation in the range of prices over time to capture the level of reversion.\r\nThe four graphical results in the video starting at 03:57 (Alpha Coverage, Capital Distribution, PnL by Capitalization and Sharpe by Sector) are visible on the BRAIN platform only to consultants. The simulation setting \u201cMax stock weight\u201d has been renamed to \u201cTruncation\u201d.",
+        "transcript": "In this video, we\r\nwill talk about another reversion idea\r\nthat uses a variation in\r\nthe range of prices to capture\r\nthe level of reversion. We\r\nwill test two different kinds of ideas,\r\none that uses the max\r\nand min operator to output\r\nthe maximum or minimum between\r\ntwo quantities.\r\nAnd the second, which uses\r\nthe time series max operator\r\nand the time series min operator\r\nto output the maximum or\r\nminimum of one quantity\r\nover a time period. Now\r\nlet's talk about the first idea.\r\nThe hypothesis is\r\nthat stock has a higher probability\r\nof reversion if the difference between\r\nthe close price today and\r\nthe minimum price between\r\ntoday and yesterday's close price\r\nboth inclusive,\r\nis high\r\nwhen compared with the maximum\r\nrange of price variation\r\nbetween today's close\r\nand yesterday's close for\r\nthe same stock.\r\nSounds a little complex?\r\nThis will become clearer when we look at\r\nthe implementation.\r\nSo as you can see on your screen\r\nthe formula for the implementation.\r\nThis implementation uses two\r\noperators:\r\nthe max operator and\r\nthe min operator.\r\nThe max operator takes two vectors\r\nas arguments\r\nand returns a single vector.\r\nThe parallel maxima of\r\nthe vectors that are given as the input.\r\nSimilarly, the min operator\r\nTakes two vectors as arguments\r\nand returns a single vector,\r\ngiving the parallel minima\r\nof the vectors provided as the\r\ninput to the operator\r\nthe backtesting simulation runs\r\nfor the previous five years\r\nto generate an Alpha vector\r\nfor each day.\r\nIf the value for the stock is negative,\r\nthe simulator short the stock\r\nAnd it goes long on the stocks with\r\npositive values\r\nin the simulation environment, we are\r\nusing the top 3000\r\nUS stocks on the basis of the\r\nliquidity.\r\nThe maximum capital any stock can\r\ntake is 10%\r\nand I'm using the data before\r\na particular time stamp in a day\r\nand start trading after\r\ntime stamp to prevent\r\nany look ahead bias.\r\nAnd this is captured using the delay\r\nzero in these settings\r\nas in the implementation,\r\nthe numerator calculates\r\nthe five days average\r\nof the delta of the close\r\nand the minimum price\r\nbetween close price that day\r\nor the day before,\r\nboth inclusive\r\nand the denominator calculates\r\nthe average of the minimum\r\nrange of price between\r\nthat day and the close\r\nprice the day before. The\r\nnumerator will be greater than or\r\nequal to zero,\r\nand the denominator will always\r\nbe greater than zero.\r\nThe negative sign in front of the\r\nexpression signifies a\r\nstrong reversion if the ratio\r\nis high\r\nand a weaker reversion\r\nif the ratio is low compared\r\nwith the stocks in the universe we\r\ndecided to trade and as mentioned\r\nin the simulation settings. Now looking\r\nat the results, the results\r\nhave a Sharpe of 2.2.\r\nThe returns-to-drawdown ratio is\r\napproximately 4,\r\nand the turnover is around\r\n35%. Now, looking\r\nat the detailed performance parameters,\r\nthere is a good coverage for this\r\nAlpha idea.\r\nSo we decided to trade top 3000\r\nstocks and we have a decent coverage.\r\nThe PnL is generated from\r\ndifferent capitalization of stocks,\r\nwhich means the idea is working\r\nwell across different cap stocks.\r\nThen the capital is distributed well\r\nacross different industries,\r\nwhich means that we have a\r\ngood enough concentration of capital in\r\ndifferent groups of stocks.\r\nAnd finally, we have a decent\r\nSharpe across different sectors,\r\nwhich means that the idea has\r\na prediction power across different\r\nsectors.\r\nSo this gives us a little confidence about\r\nthe robustness of our idea. Now let's\r\ndiscuss this second idea. The\r\nhypothesis is\r\nthe probability of reversion\r\nin a stock is much higher\r\nif the difference between the close\r\nprice today\r\nand the maximum\r\nof the high price in\r\nthe past five days is\r\nlarge.\r\nThis reversal would be relatively\r\nweak in a stock\r\nwhose maximum range of price\r\nvariation over previous five\r\ndays was also high.\r\nAs you look on your screen, the implementation\r\nof this idea is right there.\r\nSo this implementation uses two\r\noperators:\r\nthe time series max operator\r\nand the time series min operator.\r\nTs_max operator or\r\nthe time series maximum operator\r\ncalculates the maximum value\r\nof the quantity X over\r\nthe past N days,\r\nand the Ts_min operator calculates\r\nthe minimum value of X over\r\nthe past N days\r\nIn the simulation environment, we are using\r\nthe top 3000 US stocks\r\non the basis of the liquidity.\r\nThe maximum capital\r\nany stock can take is 10%.\r\nThis avoids any concentration on one stock,\r\nand I'm using the data with Delay-1\r\nto prevent any look ahead\r\nbias.\r\nnote that these operators\r\nare different from the max and\r\nthe min operator we used in the\r\nfirst idea.\r\nAs you see in the implementation,\r\nthe numerator calculates the\r\ndifference in the current close\r\nand the highest price in\r\nthe previous five days.\r\nThe denominator calculates the\r\nmaximum price variation\r\nin the past five days.\r\nIf the ratio is high, it\r\nsuggests stronger reversion\r\nas we discuss in the hypothesis.\r\nThe rank operator is finally\r\napplied to the ratio to\r\nsmooth out the output and\r\nprovide a number between\r\nzero and 1.\r\nThe results have a Sharpe of 2\r\nThe return to drawdown ratio is approximately  4\r\nand the turnover is around 40%.\r\nAnd if we analyze the detailed\r\nperformance parameters: again,\r\nwe have a good coverage for\r\nthe top 3000 universe be selected\r\nto trade. The PnL is generated\r\nfrom different capitalization\r\nof stocks, and the capital\r\nis distributed well across\r\ndifferent industries.\r\nAnd finally, if we look at the Sharpe\r\nfrom different sectors, we see\r\nthat we have a decent Sharpe\r\nfrom different sectors, which implies\r\nthat the prediction of this idea is quite\r\ndecent across different sectors\r\nthat we are trading\r\nas a possible improvement to both\r\nthe ideas\r\ntry to combine different durations\r\nof price change to make the results\r\nmore robust and less parameter\r\nsensitive.\r\nYou also could try different\r\ntime periods, depending on the\r\nvolatility of the stocks.\r\nBear in mind that smaller\r\ncap stocks have longer\r\ntrends than the large cap stocks,\r\nwhich could also mean that\r\nthe large cap stocks have strong\r\nreversion as compared to\r\nthe small cap stocks. As\r\nyou try to implement these improvements\r\nto the idea or try\r\nother ideas that you have,\r\nthe signal would improve and provide you\r\nbetter results.",
+        "lastModified": "2023-04-28T11:27:13.322725-04:00",
+        "highlights": [
+          {
+            "section": "transcript",
+            "content": [
+              "The hypothesis is\r\nthat stock has a higher probability\r\nof reversion if the difference between\r\nthe <em>close</em>",
+              "price today and\r\nthe minimum price between\r\ntoday and yesterday's <em>close</em> price\r\nboth inclusive,\r\nis high",
+              "when compared with the maximum\r\nrange of price variation\r\nbetween today's <em>close</em>\r\nand yesterday's <em>close</em>",
+              "calculates\r\nthe average of the minimum\r\nrange of price between\r\nthat day and the <em>close</em>\r\nprice the day",
+              "As you see in the implementation,\r\nthe numerator calculates the\r\ndifference in the current <em>close</em>\r\nand"
+            ]
+          }
+        ],
+        "videoCourse": "time-series-operators"
+      },
+      {
+        "id": "analyst-data-value",
+        "category": "Data",
+        "title": "Analyst Data Value",
+        "uid": "ubpuoTMjGcT4EbD1wHCHRV",
+        "numericalId": 2573719,
+        "language": "en",
+        "sequence": 0,
+        "source": "VidYard",
+        "description": "The video demonstrates how an alpha can be generated based on analysts\u2019 estimate of earnings per share (EPS) and how combining this ratio with estimates such as the sales per share ratio can improve an alpha. \r\nThe four graphical results in the video starting at 04:03 (Alpha Coverage, Capital Distribution, PnL by Capitalization and Sharpe by Sector) are visible on the BRAIN platform only to consultants. The simulation setting \u201cMax stock weight\u201d has been renamed to \u201cTruncation\u201d.",
+        "transcript": "In this video,\r\nwe will discuss an idea based\r\non an analyst data value,\r\nwhich is the estimate\r\nof the earnings per share. This\r\nis a consensus analyst estimate.\r\nEarnings per share represents the\r\namount of net income a company\r\ngenerates per share.\r\nIt indicates a company's\r\nprofitability. Earnings per share\r\nis calculated by dividing\r\nthe net income after the distribution\r\nof dividends on preferred\r\nstock by the average number\r\nof outstanding shares over\r\na period.\r\nThe estimate of earnings per share\r\nby the close price represents\r\nthe amount of estimated profit\r\na company will generate in the future\r\nfor each outstanding share\r\nat the current stock price.\r\nThe higher the number, the more\r\nattractive stock is to buy and\r\nvice versa. The estimate value\r\nmakes this ratio forward looking\r\nand helps us generate an Alpha\r\nbased on this ratio.\r\nOur hypothesis is, if\r\na company's estimated earnings per\r\nshare by the close ratio\r\nis improving with time,\r\nthe higher ratio indicates higher\r\nreturn potential for the stock,\r\nand it's likely that the stock\r\nprices will increase. However,\r\nif the ratio is decreasing with\r\ntime due to decreased return\r\npotential, the stock price might\r\ndecrease. Now, let's look\r\nat the implementation of the idea.\r\nThe implementation uses two operators,\r\nthe rank operator and\r\nthe time series rank operator. The\r\nrank operator ranks the\r\ninput argument of stock\r\namong all the stocks in the universe\r\nso that the assigned\r\nvalue is equally distributed\r\nbetween zero and one.\r\nThe time series rank operator\r\nranks the first argument value\r\nwith respect to its own values\r\nover the past N days,\r\nwhere N is the second argument.\r\nAnd the operator returns the rank\r\nof the current value and the value\r\nlies between zero and one.\r\nThe backtesting simulation runs\r\nfor the previous five years to\r\ngenerate an Alpha vector for each\r\nday. If the value for the\r\nstock is negative, it shorts\r\nthe stock and goes long\r\non stocks with positive values.\r\nFor this simulation, we are using\r\nthe top 3000 US stocks\r\non the basis of liquidity.\r\nThe maximum capital any stock can take\r\nis 10%.\r\nWe are using the data with the Delay-1\r\nto prevent any look ahead\r\nbias,\r\nand the Alpha is neutralized over subindustry.\r\nNow let's\r\ntalk how our idea gets implemented\r\nusing the expression.\r\nThe time series rank operator\r\ncompares the current value\r\nof the estimated earnings per\r\nshare by close with the\r\nvalues over the past 40\r\ndays. If the stock price decreases\r\nor the estimated earnings per\r\nshare of the stock is revised\r\nto a higher value, the ratio\r\nwill increase.\r\nThe increased ratio will result\r\nin higher values being assigned by\r\nthe time series rank operator.\r\nThe duration of 40 days represents\r\na two-month trading period. Now\r\nthe rank operator smooths the value\r\nreturned by the time series rank\r\noperator\r\nso that the output values are\r\nequally distributed between zero\r\nand one for all the stocks\r\nin the universe. When we look at the\r\nresults,\r\nthe Sharpe is around 1.9,\r\nthe returns-to-drawdown ratio is approximately\r\ntwo, and turnover is about 40%.\r\nWhen we analyze the detailed performance\r\nparameters,\r\nwe have decent coverage for this idea\r\nacross the selected universe.\r\nThe PnL generated is decently\r\ndistributed across all the\r\ncapitalization groups.\r\nThe capital distribution across\r\nindustries\r\nis also even,\r\nand finally, if you look at the Sharpe\r\nacross the different sectors,\r\nthis idea has decent predictability\r\nacross various sectors.\r\nNow let's talk about the potential\r\nways to improve the idea.\r\nThis idea could be improved by\r\ncombining the estimate value\r\nof earnings per share with\r\nthe other estimate the analysts have\r\nprovided. This will help us incorporate\r\nmore information about the market\r\nconsensus values. For example,\r\nwe can use the estimate sales\r\nper share value,\r\nwhich could be combined with this\r\nexisting ratio to capture more\r\ninsights about companies expected\r\nbusiness performance on the revenue\r\nfront.",
+        "lastModified": "2023-04-28T11:33:25.404503-04:00",
+        "highlights": [
+          {
+            "section": "transcript",
+            "content": [
+              "The estimate of earnings per share\r\nby the <em>close</em> price represents\r\nthe amount of estimated profit\r\na",
+              "Our hypothesis is, if\r\na company's estimated earnings per\r\nshare by the <em>close</em> ratio\r\nis improving with",
+              "The time series rank operator\r\ncompares the current value\r\nof the estimated earnings per\r\nshare by <em>close</em>"
+            ]
+          }
+        ],
+        "videoCourse": "analyst-data"
+      },
+      {
+        "id": "simulation-results",
+        "category": "Introduction",
+        "title": "Simulation Results",
+        "uid": "asrL8yGdk7rhDb473BhQvu",
+        "numericalId": 6110675,
+        "language": "en",
+        "sequence": 6,
+        "source": "VidYard",
+        "description": "This video discusses the types of results generated when a simulation is completed and how to interpret and use the simulation results to refine your Alpha ideas.\r\nThe 4 graphical results from 5:16 onwards are only visible to consultants: PnL by Capitalization, Alpha Coverage, Capital Distribution and Sharpe by Sector.\r\n\r\nHIGHLIGHTS GENERATED WITH THE HELP OF AI\r\n\r\n\u2022\t\ud83d\udcdd The aggregate performance parameters include various simulated metrics, such as returns, PnL, the information ratio (or Sharpe ratio), turnover, and drawdown.\r\n\u2022\t\ud83d\udca1 Returns represent the average of the daily return for each year, while PnL represents the profit and loss generated by the Alpha idea.\r\n\u2022\t\ud83d\udcca The information ratio (or Sharpe ratio) provides risk-adjusted returns and is a crucial indicator of the prediction ability of the model.\r\n\u2022\t\ud83d\udd04 Turnover represents the cost of trading a signal, with a lower turnover being better. It should ideally be kept below 40%.\r\n\u2022\t\ud83d\udcc9 Drawdown represents the percentage of the largest loss incurred during any year in backtesting. The return-to-drawdown ratio should ideally be greater than one.",
+        "transcript": "Once the simulation\r\nis complete, the platform will present\r\nyou with the results. The results\r\ncome in two forms. First,\r\nthe aggregate performance parameters\r\nand second, the detailed analysis\r\nof the aggregate performance parameters.\r\nLet's first talk about the aggregate\r\nperformance parameters. The aggregate\r\nperformance parameters include returns,\r\nPnL,\r\nthe information ratio or the\r\nSharpe ratio,\r\nturnover,\r\nand drawdown.\r\nYou will analyze these to determine\r\nif the results are satisfactory\r\nor if you need to work more to\r\nimprovise your signal.\r\nNow let's talk about each of these performance\r\nparameters in detail. The first\r\none is the return. The return\r\nfor every year in the simulation results\r\nrepresents the average\r\nof the daily return for that year.\r\nThe daily return is calculated\r\nas the difference of today's\r\nclose price and yesterday's close\r\nprice,\r\nthe whole divided by the yesterday's\r\nclose price.\r\nThe second performance parameter is\r\nthe PnL.\r\nPnL is the profit and the loss\r\ngenerated by your idea.\r\nTo calculate the PnL you sum\r\nthe product of the position and\r\nthe daily return for every stock\r\nin the universe that you decided to trade.\r\nSo the higher the PnL, which means\r\nif the profits are good, the better it\r\nis for your Alpha idea.\r\nThe next performance parameter is\r\nthe information ratio.\r\nThe information ratio or the Sharpe\r\nratio, provides the risk\r\nadjusted returns. This\r\nis the most important ratio that\r\nyou would take care of when you're developing your\r\nAlpha. It can be treated as\r\na proxy for the prediction ability\r\nof your model. The higher the information\r\nratio or the Sharpe ratio,\r\nthe better your Alpha is. A\r\nmore consistent information ratio\r\nor Sharpe ratio over years\r\nof backtesting indicates\r\nthat your signal has worked well over\r\ndifferent years in the In-Sample\r\nand has produced consistent performance.\r\nThis gives you higher confidence to\r\ninvest your money in that particular\r\nsignal. So the prediction ability,\r\nas I mentioned, of the Alpha is captured\r\nby this ratio. And it is calculated\r\nas the mean of the daily\r\nPnL divided by\r\nthe volatility of the daily PnL,\r\nwhich is calculated as the standard\r\ndeviation of the daily PnL.\r\nWhile the Sharpe ratio is nothing but\r\nthe annualized IR,\r\nand it is calculated as the IR\r\nmultiplied with the square\r\nroot of 252.\r\nNow what is 252? The 252\r\nparameter represents the\r\nestimated number of trading\r\ndays in a year. So the next\r\nimportant parameter is the turnover.\r\nThe turnover represents the cost\r\nof trading a signal. It is equal\r\nto the ratio of the value\r\ntraded to the value held.\r\nAnd the idea behind this is when\r\nwe try to execute long-short\r\ntrades in the market,\r\nas suggested by your Alpha,\r\nthere's a cost attached to\r\ndoing that and this cost is\r\ncaptured by the turnover. The\r\nlower the turnover, the better\r\nit is.\r\nAnd as a practice when you develop\r\nan Alpha,\r\nyou should target a turnover below\r\n40%. I repeat this\r\nagain because this is very important to understand\r\nthat turnover should be low\r\nfor your Alpha and try\r\nto keep it below 40%.\r\nThere are also delay-0 and\r\ndelay-1 Alphas\r\nand usually you would see that delay-0\r\nalphas have higher turnovers,\r\nbut your focus should still\r\nbe to keep the turnovers below\r\n40%, both for delay-0\r\nand delay-1.\r\nThe next performance parameter\r\nis the drawdown.\r\nThe drawdown represents the percentage\r\nof the largest loss incurred\r\nduring any year in your\r\nbacktesting.\r\nAs a practice, you should target\r\na return-to-drawdown ratio greater\r\nthan one.\r\nThe higher the ratio\r\nof returns to drawdown,\r\nthe better it is for your Alpha.\r\nI repeat, I'm talking about the\r\nratio of the returns to drawdown,\r\nbut the drawdown should be\r\nlow. The lower the drawdown,\r\nthe better it is. But the returns\r\nto drawdown ratio should be higher.\r\nSo now we have talked about all the\r\naggregate performance parameters that\r\nyou see in your results.\r\nSo having learned about the\r\naggregate performance parameters,\r\nnow let's talk about the detailed\r\nanalysis of the aggregate performance\r\nparameters. The platform will\r\nprovide to you the in depth\r\nanalysis of how this\r\naggregate performance parameters can\r\nbe broken down. So this will include\r\nthe graphical results representing\r\nthe capital distribution,\r\nthe coverage, Sharpe ratio\r\nand the PnL generated\r\nby different industries, different\r\nsectors and different capitalization\r\nof stocks grouped together.\r\nSo the more diversified the sources\r\nof performance across industries,\r\nsectors and capitalization,\r\nthe more robust your Alpha\r\nis. Why? Because\r\nyour Alpha is deriving performance,\r\nnot from a single stock, but\r\nfrom a group of different\r\nkinds of stocks.\r\nAnd in a quantitative Alpha, this\r\nparameter is very, very important.\r\nWhy? Because we do not trade\r\na few stocks. We in a quantitative\r\nAlpha, we trade a big\r\nset of stocks.\r\nSo as I mentioned, it's good if\r\nthe capital is distributed across\r\ndifferent industries, the PnL\r\nis generated by stocks of varying\r\ncapitalization,\r\nas that would indicate that the idea\r\nworks well across different kinds of stocks,\r\nand the Sharpe by sector shows\r\nthe signal has predictability across\r\nvarious sectors. So in a\r\nquantitative Alpha, it's not\r\nonly important to have good\r\naggregate parameters, you\r\nalso should ensure that the\r\nperformance is derived from a diversified\r\nset of stocks. This prevents\r\nany concentration risk\r\non a given sector, industry or\r\nany other standard group. Now that\r\nyou have learned about the aggregate\r\nperformance parameters and the way\r\nto analyze the details of these\r\nperformance parameters, I hope\r\nthis will help you create the Alphas,\r\nwhich would perform better in the Out-of-Sample.",
+        "lastModified": "2024-01-25T03:23:16.532188-05:00",
+        "highlights": [
+          {
+            "section": "transcript",
+            "content": [
+              "The daily return is calculated\r\nas the difference of today's\r\n<em>close</em> price and yesterday's <em>close</em>\r\nprice",
+              ",\r\nthe whole divided by the yesterday's\r\n<em>close</em> price."
+            ]
+          }
+        ],
+        "videoCourse": "introduction-alphas"
+      },
+      {
+        "id": "alphas-holding-frequencies-and-delays",
+        "category": "Getting Started",
+        "title": "Alphas by Holding Frequencies and Delays",
+        "uid": "XqdcIayjAug",
+        "numericalId": null,
+        "language": "en",
+        "sequence": 2,
+        "source": "YouTube",
+        "description": "Learn about the  holding periods in quant finance and the importance of delayed data to prevent look-ahead bias through an example.",
+        "transcript": "Alphas by Holding Frequencies and Delays**\r\n\r\nAs a reminder, WorldQuant defines an alpha as a mathematical model that seeks to predict the future price movement of various financial instruments.\r\n\r\nI'm Nitish Maini, your partner in learning about quant finance research. I'm the Chief Strategy Officer at WorldQuant. In my role, I help define our firm's strategy and drive several cross-functional business initiatives, including new avenues for growth and innovation.\r\n\r\nIn this video, we will focus on the role played by holding frequencies and data delays.\r\n\r\n**Holding frequency** is the total length of time an investor expects to hold a portfolio or security. The holding period has implications on risk, returns, and transaction costs.\r\n\r\n**Data delay** refers to the time before which the alpha is allowed to use the data in its backtest. More recent data contains up-to-date information, which may benefit alpha performance, but data delay helps ensure there are no look-ahead biases\u2014an important concept we will explain in depth in this video.\r\n\r\nIf an alpha uses data from the day before the date of the backtest, I will call it a **delay-1 alpha**. If the alpha uses today's price up to a chosen time during the day for simulation to run after that time, I will call it a **delay-0 alpha**, because it uses same-day information.\r\n\r\nWe will also put our ideas to the test on WorldQuant Brain, our cloud-based platform where we can get real-time feedback. If you would like to try this as I explain these ideas, log into Brain now.\r\n\r\nAlphas can be classified into three categories based on the holding period:\r\n\r\n1. **Medium- to low-frequency alphas:**  \r\n   These are alphas with holding periods that range from a few days to months, and sometimes even longer.\r\n\r\n2. **Intraday trading alphas:**  \r\n   These update positions much more frequently, ranging from every minute to a few hours. They are typically based on price-volume signals to capitalize on short-lived price patterns. They can also use news data, earnings announcements, or faster intraday data like sentiment or options.\r\n\r\n3. **High-frequency trading (HFT) alphas:**  \r\n   These hold positions from nanoseconds to a few seconds. HFT signals can be market-making strategies that provide market liquidity, or price arbitrage strategies that capitalize on price discrepancies between related assets or markets. They can also take short-term directional trades based on price patterns, such as short-term momentum.\r\n\r\nIt is important to prevent biases in the data during backtesting. **Look-ahead bias** happens when you use future information in your analysis that wouldn't have been known or available during the period being analyzed. This bias can lead to over-optimistic performance predictions that don't hold up in reality, skewing our expectations and potentially leading to costly surprises.\r\n\r\nTo avoid look-ahead bias, quants use delayed data in the backtest. **Delay-1 alphas** use yesterday's price. **Delay-0 alphas** use today's price up to a chosen time during the day. Theoretically, delay-0 alphas are expected to perform better than delay-1, but have lower trading capacity due to the shorter time available to trade.\r\n\r\nWe have reviewed several delay-1 alphas in our previous videos, so let's shift to a delay-0 example.\r\n\r\nWe will use volatility data, focusing on **at-the-money implied volatility** of call options expiring within four months, and their **Parkinson's volatility**. Parkinson's volatility measures realized volatility using the high and low prices within a day. It captures large intraday price variations, even when the previous day's close and the current day's close price change is small. The **strike price** is where the call option starts making a profit, and **implied volatility** represents the expected future stock movement, highly influenced by option demand. At-the-money implied volatility aggregates implied volatilities of call options where the strike price equals the stock's current price, and the option expires within four months.\r\n\r\nOur alpha idea captures call option demand using the implied volatility of its at-the-money call options expiring up to four months ahead, scaled by Parkinson's volatility over the past four months. If the implied volatility to Parkinson's volatility ratio is high, the hypothesis is that we expect high future stock returns, and vice versa.\r\n\r\nNow, let's implement this idea on WorldQuant Brain using its proprietary expressions language. In this example, we simply take the ratio of the implied volatility of at-the-money call options to Parkinson's volatility for the stock, using the data fields on the Brain platform. These delay-0 values are available by the cutoff time each day in the markets for the alpha to generate positions.\r\n\r\nThe results show a consistent Sharpe ratio of about 2 across years, 14% gross returns, a 1.2% return-to-drawdown ratio, 29% turnover, and decent coverage across the selected universe.\r\n\r\nIn this video, we learned about three holding periods in quant finance, the importance of delayed data to prevent look-ahead biases, and reviewed a delay-0 alpha example. In the next video, we will discuss the power of diversity of alphas. Step by step, I hope you are powering up your knowledge and testing out your ideas with me.\r\n\r\nLet's go quant\u2014see you in Brain.",
+        "lastModified": "2025-08-01T10:16:41.002744-04:00",
+        "highlights": [
+          {
+            "section": "transcript",
+            "content": [
+              "It captures large intraday price variations, even when the previous day's <em>close</em> and the current day's",
+              "<em>close</em> price change is small."
+            ]
+          }
+        ],
+        "videoCourse": "alpha-examples-idea-type-and-delay"
+      },
+      {
+        "id": "alpha-examples-data-category-part-1",
+        "category": "Alpha Tutorials",
+        "title": "Alpha Examples by Data Category: Part 1",
+        "uid": "40JActnyhkM",
+        "numericalId": null,
+        "language": "en",
+        "sequence": 1,
+        "source": "YouTube",
+        "description": "Explore price volume and fundamental data with Alpha examples.",
+        "transcript": "Alpha Examples by Data Category, Part One\r\n\r\nWelcome to WorldQuant\u2019s Learn to Quant, where we hope to demystify quantitative finance research and make it accessible to you, guiding you through different ideas and their implementation on WorldQuant Brain. WorldQuant Brain is a simulation platform that provides datasets and tools to test your own ideas and gain feedback in real time.\r\n\r\nI'm Nitish Maini, the Chief Strategy Officer at WorldQuant. This series is your gateway to powering up your approach to quant research. So, let\u2019s learn to quant!\r\n\r\nQuant researchers tap into a variety of data to build predictive signals, or alphas, which are defined by WorldQuant as mathematical models that seek to predict future price movements of various financial instruments. The data categories include price-volume, fundamental, analyst, sentiment, options, model, insider transactions, short interest, and more.\r\n\r\nOver the next few videos, we will introduce four data categories and illustrate each with an alpha example\u2014from idea to result. So, log into WorldQuant Brain.\r\n\r\nWe are going to start with the **price-volume** data category.  \r\nIt includes data like stock prices, the open price of a stock, high price, low price, close, and other trading-related information like volume of shares traded and market capitalization. The change in a stock\u2019s price between the open and the close of a trading session can be a potential idea. Let\u2019s see how this information can be used as a signal to generate an alpha.\r\n\r\nHere is one hypothesis: If a stock\u2019s close price is lower than its open price, we may anticipate a reversion, expecting the stock to bounce back and outperform others in the near future. We take a long position, profiting if the price of the stock rises.\r\n\r\nConversely, if the close price is higher than the open price, we may expect a reversion to a lower price, prompting us to take a short position. Shorting an instrument usually involves borrowing it from a broker, selling it in the market, and later buying it back to return to the broker. We profit if the price falls after we have shorted.\r\n\r\nNow, let\u2019s implement this idea on WorldQuant Brain using the proprietary expression language. You can access all data categories discussed in this series on Brain.\r\n\r\nThe **group rank** function takes the close and open price difference as the first input, and subindustry as the second. It ranks this difference among all stocks in the same subindustry and assigns a value between 0 and 1. Higher values get better ranks (closer to 1), and lower values get ranks closer to 0. Stocks with negative alpha values are shorted; positive ones are bought.\r\n\r\nNext, decide the data timing to use in an alpha, which we refer to as **delay**.  \r\n- **Delay 1** uses yesterday\u2019s price,  \r\n- **Delay 0** uses today\u2019s price until a chosen time.\r\n\r\nAlso, decide if you want to use **decay** for your alpha. Decay considers a weighted sum of past alpha values to smooth out fluctuations or outliers. Decay helps if you want to use previous days\u2019 alpha values or to reduce turnover.\r\n\r\nIn this simulation, we use delay-1 data to prevent look-ahead bias, neutralize alpha over subindustry, apply a decay of 10 for signal smoothing, and restrict the maximum capital on any single stock to 1%. The backtesting simulation runs for the previous five years, generating an alpha vector for each day.\r\n\r\nThe results show a consistent Sharpe ratio of 1.7 across years, with decent coverage across the selected universe of the top 3,000 US stocks based on liquidity.\r\n\r\nLet\u2019s determine how to improve this alpha. This performance could be improved by controlling turnover to trade only in conditions more conducive to reversion\u2014trading only in higher volatility conditions and holding during low volatility.\r\n\r\nNext up, the **fundamental** data category.  \r\nFundamentals capture the underlying business, financial, and operational health of a company, usually reported every quarter. While the data fields are many, they can be summarized into three financial statements: balance sheet, income statement, and cash flow statement.\r\n\r\n- The **balance sheet** provides a snapshot of the company\u2019s financial health, detailing its assets, liabilities, and equity.\r\n- The **income statement** illustrates the company\u2019s profitability, showing how revenue is transformed into income after accounting for various expenses.\r\n- The **cash flow statement** reveals the company\u2019s liquidity by tracking the inflow and outflow of cash from activities like operations, investments, and financing.\r\n\r\nNow, let\u2019s discuss an idea based on the changes in the cash flow from operations and market cap of the firm.  \r\n**Cash flow from operations** is the cash earned through core business activities.  \r\n**Market capitalization** represents the firm\u2019s worth, calculated as the current market price of one share multiplied by the total number of the company\u2019s outstanding shares. The ratio of cash flow from operations to market cap indicates if a company is fairly valued in the market with respect to its cash-generating abilities.\r\n\r\nOne theory is that a high ratio suggests an undervalued firm, which could provide higher future returns, and vice versa. The hypothesis of the alpha is that if this ratio is improving over time, then the company\u2019s stock will outperform others. Hence, we will take a long position in this firm. Similarly, if this ratio declines, we expect underperformance and take a short position.\r\n\r\nNow, let\u2019s examine how our idea gets implemented using Brain\u2019s expression language.  \r\nThe **time series Z-score** function shows how the cash flow to market cap ratio has changed over the last 60 trading days. In statistics, the Z-score describes how far a value is from the mean of a group in terms of standard deviation.\r\n\r\nWe simulate the alpha expression over the top 3,000 most liquid US stocks and neutralize over the market to make the alpha long-short neutral. The results show a consistent Sharpe ratio of about 2 across years, 9% return, 29% turnover, and decent coverage across the selected universe.\r\n\r\nTo improve the alpha\u2019s performance, consider analyst predictions for each stock\u2019s operational cash flow rather than the last actual value. Analysts\u2019 estimates provide insights into expected company performance before the actual quarterly earnings reports are released. Using these estimates may enhance the accuracy of fundamental signals.\r\n\r\nIn this video, we explored price-volume and fundamental data with alpha examples. Next, we will discuss options and sentiment data categories. Hopefully, you can grow your knowledge and further your journey into quant finance research as we explore alpha examples with other data categories.\r\n\r\nSee you there.",
+        "lastModified": "2025-08-01T10:21:36.049860-04:00",
+        "highlights": [
+          {
+            "section": "transcript",
+            "content": [
+              "It includes data like stock prices, the open price of a stock, high price, low price, <em>close</em>, and other",
+              "The change in a stock\u2019s price between the open and the <em>close</em> of a trading session can be a potential",
+              "Here is one hypothesis: If a stock\u2019s <em>close</em> price is lower than its open price, we may anticipate a reversion",
+              "Conversely, if the <em>close</em> price is higher than the open price, we may expect a reversion to a lower price",
+              "The **group rank** function takes the <em>close</em> and open price difference as the first input, and subindustry"
+            ]
+          }
+        ],
+        "videoCourse": "alpha-examples-data-category"
+      },
+      {
+        "id": "correlation-rank-operators",
+        "category": "Operators",
+        "title": "Correlation & Rank Operators",
+        "uid": "XpnPFFy8GZVxdbE47Gm7sV",
+        "numericalId": 1997583,
+        "language": "en",
+        "sequence": 2,
+        "source": "VidYard",
+        "description": "This video demonstrates an alpha idea using price volume data and how this idea can be implemented with the correlation and rank operators available on the platform.\r\n\r\nNote that ASI region and the MINVOL1M universe are visible only to consultants. The four graphical results in the video starting at 5:44 (Alpha Coverage, Capital Distribution, PnL by Capitalization and Sharpe by Sector) are visible on the BRAIN platform only to consultants. The simulation setting \u201cMax stock weight\u201d has been renamed to \u201cTruncation\u201d.",
+        "transcript": "In the process of Alpha\r\ngeneration.\r\nFirst, let's talk about an Alpha\r\nidea. After that, we will\r\ndiscuss the correlation operator\r\nand how we can use it to implement\r\nthe idea that we will discuss.\r\nThis is a more sophisticated idea,\r\nand I like how easily\r\nit's implemented using a\r\ncorrelation operator and a\r\nrank operator.\r\nThe platform provides you with price\r\nand volume data.\r\nPrice tells you in which direction\r\nthe stock is moving.\r\nVolume tells you whether there\r\nare buyers or sellers for\r\nthe stock. So the idea is\r\nfor the given universe of stocks\r\nthat one decides to trade.\r\nIf the ratio of actual volume\r\nto the average volume over the\r\npast 20 days is increasing\r\nrelative to the other stocks in the universe,\r\nthen we expect a reversal\r\nin price,\r\nassuming the market is\r\nreacting\r\nand absorbing the price information.\r\nOn the other hand, if the ratio\r\nof volume\r\nto the average volume over the past\r\n20 days\r\nis decreasing relative to other\r\nstocks in the universe,\r\nthen we expect the stock\r\nto continue the trend because\r\nthe market hasn't absorbed\r\nthe price information. The\r\nimplementation of this idea\r\nis as you can see on your screen.\r\nWe have two operators here,\r\nthe correlation operator and\r\nthe rank operator.\r\nThe correlation operator calculates\r\nthe correlation of the values in\r\nthe input vectors X and\r\nY, for the past N days.\r\nNote that this parameter\r\nN must be less than 512.\r\nThe rank operator ranks\r\nthe values of the input X among\r\nall the instruments,\r\nand it returns values\r\nwhich are float numbers equally\r\ndistributed between zero\r\nand 1.\r\nSo the stock with the maximum value of\r\nX will get a one, and the stock\r\nwith the minimum value of X will get zero.\r\nAnd the rest of the stocks will get\r\na value between zero and one,\r\ndepending on the rank in the universe.\r\nThe backtesting of this\r\nidea is done over the\r\nlast five years,\r\nand it generates an Alpha vector\r\nfor each day.\r\nIf the value for the stock is negative,\r\nthe simulator would shot\r\nthe stock\r\nand if the value is positive,\r\nthe simulator would long the stock.\r\nIn terms of the simulation environment\r\nwhich we control from the simulation\r\nsettings, the maximum capital that we\r\nwould put on any stock is less than\r\n10%, and the\r\nneutralization is subindustry.\r\nNow let's talk about\r\nhow the idea I explained gets\r\nimplemented using the expression.\r\nThere are four scenarios that\r\nare explained by the expression that\r\nyou can see on the screen.\r\nFirst, if the close price\r\nand the volume ratio have\r\nincreased more than those\r\nof the other stocks in the universe,\r\nthe correlation will be positive.\r\nWe say the market has absorbed\r\nthe price information\r\nby increased volume ratio,\r\nand we will see the reversal\r\nin price. So we will want to\r\nshort the stock,\r\nand placing a negative sign in\r\nfront of the expression will help us\r\nachieve that.\r\nSecond, if the close price\r\nand the volume ratio have fallen\r\nmore than those of the other stocks\r\nin the universe,\r\nthe correlation will be positive.\r\nWe say the market hasn't\r\nabsorbed the price information because\r\nthe volume ratio is falling as\r\ncompared to the other stocks\r\nin the universe.\r\nThe probability of reversal is weaker\r\nthan for the other stocks, so\r\nthe stock will continue the trend in\r\nthe direction of the price.\r\nIn this case, the prices are falling\r\nmore as compared to other stocks,\r\nso we will short this stock\r\nand placing a negative sign in\r\nfront of the expression helps us achieve\r\nthat.\r\nIn the 3rd scenario,\r\nthe close price has increased\r\nand the volume ratio has fallen\r\ncompared to the other stocks in the\r\nuniverse.\r\nAnd using the similar logic, we\r\nassume the market hasn't\r\nyet reacted strongly compared\r\nto how it has done for the other stocks.\r\nSo the price trend will likely continue\r\nand we want to long the stock.\r\nIn this case, the correlation is negative,\r\nso the negative sign in front of the\r\nexpression will make the expression positive\r\nand we will long stock.\r\nFinally,\r\nif the close price has fallen\r\nand the volume ratio has increased\r\nas compared to the other stocks in the universe,\r\nthe market has reacted strongly,\r\nso the price trend will likely revert\r\nand we want to long the stock.\r\nIn this case, the correlation is\r\nnegative, so the negative sign in\r\nfront of the expression will make\r\nthe expression positive and we will long\r\nthe stock.\r\nSo if we look at the results,\r\nthe Sharpe is somewhere around 2.\r\nThe turnover is around 40%\r\nand the return to draw down ratio is\r\ngreater than one\r\nand if we look at the detailed analysis,\r\nwe have a good coverage across\r\nthe universe that we selected to trade.\r\nThe PnL generated across different\r\ncapitalization groups is quite\r\ndecent and the capital is distributed\r\nacross industries, which\r\nshows that the performance is also\r\ndriven from different industries.\r\nAnd finally, if we look at the Sharpe\r\ngenerated from various sectors, it\r\nshows that the idea has decent\r\nprediction value across different\r\nsectors.\r\nSo this illustration helps us\r\nunderstand how a correlation\r\noperator can help us develop\r\nan Alpha\r\nUsing information from two\r\ndata inputs that affect\r\neach other.\r\nIt also highlights the strength\r\nof the rank operator.\r\nThe rank operator helps\r\nsmooth out the relative difference\r\namong the stocks in the universe\r\nand facilitates the capital allocation\r\nand the long short decisions.\r\nNow, what could be possible improvements\r\nto this idea?\r\nIn this idea, we have taken\r\na correlation between two\r\nentities over five days.\r\nAs a possible improvement to this idea.\r\nYou can try compare the short\r\nterm correlation between the two quantities\r\nwithin long term correlation,\r\nand you can try to understand whether\r\nthe short term correlation will\r\ntend towards the long term\r\ncorrelation between these two entities.\r\nSo this illustration helps us\r\nunderstand how a correlation\r\noperator can help us develop an\r\nAlpha using information\r\nfrom two data inputs that\r\naffect each other. It\r\nalso highlights the strength\r\nof the rank operator with\r\nsmooths out the relative difference\r\namong the stocks in the universe\r\nand facilitates the capital\r\nallocation and the long short decisions.",
+        "lastModified": "2023-04-28T11:21:37.416112-04:00",
+        "highlights": [
+          {
+            "section": "transcript",
+            "content": [
+              "First, if the <em>close</em> price\r\nand the volume ratio have\r\nincreased more than those\r\nof the other stocks",
+              "Second, if the <em>close</em> price\r\nand the volume ratio have fallen\r\nmore than those of the other stocks\r\nin",
+              "In the 3rd scenario,\r\nthe <em>close</em> price has increased\r\nand the volume ratio has fallen\r\ncompared to the",
+              "Finally,\r\nif the <em>close</em> price has fallen\r\nand the volume ratio has increased\r\nas compared to the other"
+            ]
+          }
+        ],
+        "videoCourse": "basic-operators"
+      },
+      {
+        "id": "pasteurize-log-covariance-stddev-operators",
+        "category": "Operators",
+        "title": "Pasteurize, Log, Covariance & StdDev Operators",
+        "uid": "8SDCNMLPXC8Y2NbPiyYnyv",
+        "numericalId": 2587225,
+        "language": "en",
+        "sequence": 2,
+        "source": "VidYard",
+        "description": "Quantitative alphas may require checks to ensure that they are working correctly. This video demonstrates some techniques that can be used to check alphas.\r\nThe simulation setting \u201cMax stock weight\u201d has been renamed to \u201cTruncation\u201d.",
+        "transcript": "In this video,\r\nwe will talk about some important\r\nchecks a quantitative Alpha\r\nmight need depending on\r\nthe implementation.\r\nWe will also discuss how to use\r\na few techniques, such as log\r\ncovariance and standard deviation.\r\nA quant usually trades a big\r\nset of stocks, so it's very\r\nimportant to apply some checks\r\nto the Alphas to ensure\r\nnothing is going wrong.\r\nWe have already talked about the simulation settings.\r\nThere are two other checks you\r\nshould take care of,\r\nespecially while you are working\r\nwith the python framework. First\r\ncheck to make sure you are trading\r\nthe right set of stocks as\r\ndefined by the universe.\r\nSecond, check to see\r\nif any value in the expression\r\nisn't tending towards infinity.\r\nThe operator Pasteurize helps\r\nus do that.\r\nIt sets to NaN if the signal\r\nis infinite or if\r\nthe underlying instrument isn't in the\r\nuniverse.\r\nTo demonstrate how pasteurize\r\nis used, let's apply\r\nit to a simple Alpha idea. We\r\nvwap over close. The implementation\r\nof this Alpha is as\r\non your screen.\r\nThe operator log outputs\r\nthe natural logarithm of the\r\nvalue given by the input expression,\r\nthe back testing simulation runs\r\nfor the previous five years to\r\ngenerate an Alpha vector\r\nfor each day.\r\nIf the value for the stock is negative,\r\nthe simulator shorts the stock,\r\nand goes long on the stocks with\r\npositive values.\r\nIn the simulation environment, we\r\nare using the top 3000 U.S.\r\nstocks on the basis of liquidity.\r\nThe maximum capital and the stock can\r\ntake is 10%.\r\nI'm using the data with Delay-one\r\nto prevent any look ahead bias\r\nand the Alpha is neutralized over\r\nsubindustry.\r\nWhen we look at the results,\r\nthe Sharpe is 2.\r\nThe returns-to-drawdown ratio is\r\napproximately 3\r\nand the turnover is around 40%.\r\nYou should also look at the detailed performance\r\nparameters to check\r\nif the performance is derived\r\nfrom a bigger set of stocks\r\nas we explained in 'The simulation\r\nresults' video.\r\nNow,\r\nlet's discuss an Alpha that uses\r\ncovariance and standard deviation\r\noperators.\r\nThe idea is if the covariance\r\nbetween the volatility of returns\r\nand the delta of close price\r\nand the volume weighted average\r\nprice over the past month is\r\nhigh, we should go long\r\nthat stock and vice versa.\r\nNow let's discuss the implementation\r\nof this idea using an expression\r\nThe covariance operator\r\ntakes as input two vectors\r\nx and y, as well\r\nas the time period\r\nand outputs the covariance,\r\nwhich is a measure of how much two\r\nrandom variables change together,\r\nNote that the time period must\r\nbe less than 512 days.\r\nThe standard deviation operator\r\ntakes as input vector X\r\nand the time period and outputs\r\nthe standard deviation, which\r\nis a measure used to quantify\r\nthe amount of variation or\r\ndispersion of a set of\r\ndata values. Note that\r\nthe time period must be less than 512\r\ndays. The backtesting simulation\r\nruns for previous five years\r\nto generate an Alpha vector\r\nfor each day.\r\nIf the value for the stock is negative,\r\nthe simulators shorts the stocks\r\nand goes long on stocks\r\nwith positive values.\r\nIn the simulation environment, we\r\nare using the top 3000 US\r\nStocks on the basis of liquidity.\r\nThe maximum capital any stock can\r\ntake is 10%.\r\nI'm using the data before a particular\r\ntime stamp in a day and start\r\ntrading after that time stamp\r\nto prevent any look ahead bias.\r\nThis is captured by using Delay-zero.\r\nIn these settings,\r\nthe neutralization used is\r\nsubindustry,\r\nand if we look at the results, the\r\nSharpe is 2.\r\nThe returns-to-drawdown ratio is greater\r\nthan 5\r\nand the turnover is around 25%.\r\nYou should also look at the detailed performance\r\nparameters to check if the\r\nperformance is derived from\r\na bigger set of stocks. As\r\nwe explained in this simulation results\r\nvideo. To summarize,\r\nwhile developing a quantitative Alpha,\r\nyou should always take care of corner\r\ncases to avoid any\r\npotential biases or errors\r\nin the implementation.\r\nAlso, various statistical\r\ntechniques are available that\r\ncan be used to implement the same idea\r\nin many different ways.",
+        "lastModified": "2023-04-28T11:25:28.831437-04:00",
+        "highlights": [
+          {
+            "section": "transcript",
+            "content": [
+              "We\r\nvwap over <em>close</em>. The implementation\r\nof this Alpha is as\r\non your screen.",
+              "The idea is if the covariance\r\nbetween the volatility of returns\r\nand the delta of <em>close</em> price\r\nand the"
+            ]
+          }
+        ],
+        "videoCourse": "time-series-operators"
+      },
+      {
+        "id": "tradewhen-argmax-argmin-operators",
+        "category": "Operators",
+        "title": "TradeWhen, ArgMax & ArgMin Operators",
+        "uid": "KReqeMNzbvo7y9qXJ1A7XD",
+        "numericalId": 1997441,
+        "language": "en",
+        "sequence": 1,
+        "source": "VidYard",
+        "description": "This video shows how an alpha can be generated by developing indicators that identify events that have a significant and lasting impact on the market.\r\nThe four graphical results in the video starting at 04:03 (Alpha Coverage, Capital Distribution, PnL by Capitalization and Sharpe by Sector) are visible on the BRAIN platform only to consultants. The simulation setting \u201cMax stock weight\u201d has been renamed to \u201cTruncation\u201d.",
+        "transcript": "At times,\r\nevents in the market create a significant\r\neffect that lasts for a\r\nlong time and generates a\r\ntrend.\r\nDeveloping your own indicators\r\nto identify such events can\r\ngenerate some good Alphas. The\r\nidea is to identify an event,\r\nEnter Opposition\r\nand hold it for N days\r\nuntil you believe the impact\r\nof the event no longer exists.\r\nWe will look at two Alphas based\r\non this idea.\r\nThe implementation of this idea\r\nis as on your screen,\r\nwe use the TradeWhen operator\r\nin this idea and we also\r\nuse the ArgMax operator.\r\nThe back testing simulation runs\r\nfor the previous five years to\r\ngenerate an Alpha vector for\r\neach day. If the value for\r\nthe stock is negative,\r\nthe simulator shorts the stock\r\nand it goes long on stocks that\r\nhave positive values.\r\nIn the simulation environment, we\r\nare using the top 3000 US\r\nstocks on the basis of liquidity.\r\nThe maximum capital any stock\r\ncan take is 10%.\r\nI'm using the data with a delay-one\r\nto prevent any look ahead bias.\r\nThe Alpha is neutralized over\r\nsubindustry. Now let's\r\ndiscuss how the idea I have explained\r\ngets implemented using the expression\r\nyou can see.\r\nAgain, we have two operators\r\nthe TradeWhen operator and the\r\nArgMax Operator.\r\nThe ArgMax operator returns\r\nthe relative index of max\r\nvalue in the time series\r\nX for the past\r\nN days.\r\nIf the current day has the max value\r\nfor the past N days, it\r\nreturns zero.\r\nIf the previous day has the max value\r\nfor the last N days,\r\nit returns one.\r\nIf all values in the past N\r\ndays are NaN, it returns\r\nzero.\r\nThe TradeWhen operator takes\r\nas input, the triggerTradeExpression\r\nthe AlphaExpression and\r\nthe triggerExitExpression.\r\nThe triggerTradeExpression in\r\nthe TradeWhen operator helps\r\ndefine the condition.\r\nWhen the condition goes true,\r\nit establishes that a significant\r\nevent has happened in the market.\r\nThe AlphaExpression is what you\r\nwant to give as Alpha\r\nthe day this condition goes\r\ntrue, and the triggerExitExpression\r\ndefines when\r\nyou want to quit the position it\r\nhas been holding since the\r\nday of the event\r\nIn the current implementation an\r\neven is considered significant\r\nif the current day volume is the\r\nhighest of the past five\r\ndays volume, as suggested by the\r\nArgMax operator and\r\nthe current day volume is greater\r\nthan or equal to the\r\naverage over the previous five\r\ndays. If this condition\r\ngoes true,\r\nthe Alpha is minus\r\nof rank of the difference\r\nin the close price over the last\r\ntwo days. This implies you\r\nshould go short the stocks for\r\nwhich the past two days price\r\ndifference is high\r\nand long the stocks with a low\r\nchange in price.\r\nThe exit condition being -1\r\nsuggests this condition will\r\nnever be greater than one.\r\nTherefore, the same positions\r\nwill be held until the trigger condition\r\ngoes true again.\r\nIf we look at the results,\r\nthe Sharpe is 2.2.\r\nIts returns-to-drawdown ratio of approximately\r\n4 and a turnover of around\r\n33%.\r\nIf we analyze the detailed performance\r\nparameters,\r\nwe have a decent coverage again\r\nfor this idea.\r\nThe PnL generated across different\r\ncapitalization groups is\r\nalso good, which means we have\r\nperformance derived from various\r\ncapitalization of stocks.\r\nAnd if we look at the capital distribution\r\nacross industries,\r\nwe have an evenly distributed\r\ncapital across there as well.\r\nAnd finally, if you look at the Sharpe\r\nfrom various sectors,\r\nthis idea has a decent predictability\r\nacross various sectors as well.\r\nNow let's look at the second implementation\r\nof this idea.\r\nAs you can see on your screen\r\nis the expression implementation\r\nof this idea.\r\nThe operators that we have used\r\nhere are the TradeWhen operator and\r\nthe ArgMin operator.\r\nThe ArgMin operator, like\r\nthe ArgMax operator,\r\nreturns the relative index\r\nof the minimum value in\r\nthe time series X for the\r\npast N days. If the\r\ncurrent day has the minimum value for\r\nthe past N days, it returns\r\nzero.\r\nIf the previous days have the minimum\r\nvalue for the past N days, it\r\nreturns one.\r\nIf all values in the past\r\nN days are NaN, it returns a\r\nzero.\r\nIn this implementation an event\r\nis considered significant if\r\nthe minimum volume in the past\r\nfive days was five days ago,\r\nas suggested by the output of the\r\nArgMin operator or\r\nthe current day, volume is greater\r\nthan or equal to the average\r\nvolume over the past five days.\r\nIf this condition goes true,\r\nthe Alpha is as you can see\r\non your screen,\r\nthis implies you should go along\r\non the stocks for which\r\nthe difference of the average\r\nof high and low prices\r\nand the close price\r\nis high enough.\r\nThe exit condition being -1\r\nagain suggests this\r\ncondition will never be greater than one.\r\nHence, the same positions\r\nwill be held until the trigger\r\ncondition goes true again. If\r\nwe analyze the results,\r\nWe have a Sharpe of 2.6\r\nin returns-to-drawdown ratio of approximately\r\nthree, and turnover around\r\n40%.\r\nIf you would analyze the detailed performance\r\nparameters,\r\nwe have a decent coverage across\r\nthe selected universe.\r\nThe PnL is generated across various\r\ncapitalization groups.\r\nThe capital is distributed evenly\r\nacross industries,\r\nand we have a decent Sharpe\r\nacross sectors.\r\nA possible improvement to this\r\nidea would be decaying the\r\nsignal\r\nas time since the event happened\r\nincreases.\r\nYou also should try to identify\r\ngood exit conditions,\r\nsay, to book profits or\r\nto cut your losses.\r\nNow, what would book profits mean?\r\nBook profits would mean if things went\r\naccording to your expectations and\r\nthe anticipated performance was\r\nachieved very soon,\r\nyou should try to stop holding\r\nyour signal\r\nTo control your losses, if things\r\nwent against your expectations and\r\nthe drawdown limits were achieved\r\nway before your expectations, you\r\nshould stop holding these\r\npositions.\r\nThe TradeWhen operator is a good way\r\nof reducing the turnover or\r\nthe cost involved in trading\r\nbecause it helps hold\r\nthe positions.\r\nIt's also a good way of\r\npredicting momentum.\r\nWe hope\r\nyou will be able to generate some good\r\nAlphas using these operators.",
+        "lastModified": "2023-04-28T11:24:40.839307-04:00",
+        "highlights": [
+          {
+            "section": "transcript",
+            "content": [
+              "If this condition\r\ngoes true,\r\nthe Alpha is minus\r\nof rank of the difference\r\nin the <em>close</em> price over",
+              "should go along\r\non the stocks for which\r\nthe difference of the average\r\nof high and low prices\r\nand the <em>close</em>"
+            ]
+          }
+        ],
+        "videoCourse": "time-series-operators"
+      },
+      {
+        "id": "iqc-scoring-merged-alpha-performance-criteria",
+        "category": "Introduction",
+        "title": "IQC Scoring: Merged Alpha Performance criteria",
+        "uid": "Pdqb8HVXGCApJQrfxaSNvo",
+        "numericalId": null,
+        "language": "en",
+        "sequence": 2,
+        "source": "VidYard",
+        "description": "Overview of IQC scoring criteria",
+        "transcript": "Hi, everyone.\r\n\r\nWelcome to another video related to the International Quant Championship (IQC).  \r\nIf you and your teammates have just registered for the IQC, you might be wondering how the scoring works. Some of you may have already started submitting alphas and are curious about how to improve your score and climb up the leaderboard. Don\u2019t worry\u2014we have you covered in this video.\r\n\r\nLet\u2019s understand how IQC scoring works.\r\n\r\nUnlike the WorldQuant Challenge, where individual alphas are scored with a limit of 2,000 points per day, scoring in the International Quant Championship is structured differently. The scoring is based on the **merged alpha performance** of your team.\r\n\r\nBefore we go into the details of the scoring, let\u2019s understand what **merged P&L** means.  \r\nMerged P&L is the P&L chart generated after combining the performance of all the individual alphas submitted by you and your teammates in the IQC. Your merged alpha performance score is calculated from this merged P&L chart.\r\n\r\nThe illustration here should help you understand how the merged P&L chart is generated. When you submit your first IQC alpha, your merged P&L chart will be the P&L chart for that single alpha. After your first submission, you can see how your merged P&L chart and score would look based on the alphas you have submitted, and how it would change if you submit more alphas.\r\n\r\nThe merged P&L chart is generated assuming **equal weight** on all the submitted alphas of your team. From this merged P&L chart, your merged performance score is calculated and is largely a function of three parameters:\r\n\r\n1. **Merged Performance Sharpe Ratio:**  \r\n   The Sharpe ratio measures the return on an investment compared to the level of risk taken. The higher the Sharpe, the better the score, assuming all other parameters are the same.\r\n\r\n2. **Merged Performance Return-to-Drawdown Ratio:**  \r\n   Drawdown is the largest reduction in P&L during a given period, expressed as a percentage. The larger the merged performance return-to-drawdown ratio, the better the score.\r\n\r\n3. **Merged Performance Turnover:**  \r\n   Turnover is the average measure of daily trading activity. Alphas with low turnover have lower transaction costs. Thus, the higher the merged performance turnover of your alphas, the lower the score, assuming all other parameters are the same.\r\n\r\nIt is essential to balance these parameters in your merged alpha performance. For example, an alpha with high turnover or transaction costs must be compensated with a comparatively higher Sharpe ratio.\r\n\r\nYou can think of merged performance as simulating a diverse pool of alphas to get an overall merged performance for your team. This merged performance can be optimized by working on new and diverse ideas.\r\n\r\nEvery time you simulate an alpha on the platform, you can see your merged performance score on the **Performance Comparison** tab within the alpha simulation results, just below the correlation and in-sample testing status tab. When you click **Refresh**, you can see both your current score and how the simulated alpha would impact your merged performance score if you decide to submit it.\r\n\r\nBe aware that submitting alphas that do not add value to your already existing pool of submitted alphas can reduce your merged performance score, as shown in the illustration. By \"not adding value,\" we mean the alpha does not contribute to improving the overall performance parameters of your merged alpha.\r\n\r\nIn addition to the scores, you can also see the merged performance metrics of your merged P&L chart. As shown here, you can see the Sharpe ratio, turnover, and other metrics of your merged P&L chart should you decide to submit the simulated alpha.\r\n\r\nNote that an increase in the merged P&L returns by itself does not necessarily imply an increase in the merged performance score. The score is a function of various parameters of the merged performance of alphas submitted by your team, as we saw earlier.\r\n\r\nDuring **Stage 1** of the International Quant Championship, only the **in-sample merged performance** of alphas is used to calculate the scores on the leaderboard.  \r\nWhile in **Stage 2**, **out-of-sample (OS) performance** is also taken into account to calculate the final score.\r\n\r\nIf you\u2019re new to Brain and wondering what in-sample and out-of-sample performance mean, I suggest you go through the Introduction to Alpha course in the Learn section. For a brief explanation:\r\n\r\n- **In-sample model performance** is the result you see on the platform after the alpha simulation is completed. This is derived from only the data visible to you at the time of building your alpha. For example, only data from March 2016 to February 2021 may be visible.\r\n- **Out-of-sample model performance** displays how your alpha performs on data not visible to you\u2014such as the two years after February 2021. Measuring out-of-sample performance is important to avoid overfitting your model to the data. A robust model would have OS performance similar to in-sample performance.\r\n\r\nDuring Stage 1, only your in-sample delay-1 and delay-0 performance drives your score. Note that the merged performance scores for delay-1 and delay-0 alphas are calculated separately, and the final score is calculated according to the formula you see here. So make sure you submit both delay-1 and delay-0 alphas.\r\n\r\nDuring Stage 2, OS scores are also considered to calculate the final scores on the leaderboard. For this, both the in-sample and out-of-sample scores are scaled and make equal contributions to the final score. Note that all alphas submitted by your team since the start of Stage 1 are considered for scoring during Stage 2.\r\n\r\nAs you submit alphas, you should see your team climb up the global IQC leaderboard. You can filter the leaderboard results to view how you are performing within your own university and your country. You can also see the separate delay-1 and delay-0 scores of the teams on the leaderboard and compare where you stand versus your competition.\r\n\r\n**To help you climb the leaderboard, here are a few things you can focus on:**\r\n\r\n- The most important is to submit **unique and diverse ideas**. Working on new ideas is the best way to increase your score, as diversification has the potential to reduce the risk of your merged performance and thus improve your Sharpe ratio.\r\n- Explore creating alphas using data sets you haven\u2019t worked on before.\r\n- Create both delay-1 and delay-0 alphas. Note that the delay-1 alpha\u2019s merged performance score has a higher contribution to your final score.\r\n- Create alphas across both liquid and illiquid universes. For example, if you\u2019re submitting alphas in the USA top 3,000, submitting alphas in the top 200 or top 500 universe might add value to your merged performance score.\r\n- Keep the turnover of your alphas in check. Higher turnover inversely impacts your score. For price-volume data sets, keeping turnover less than or close to 40% is recommended, but make sure it is compensated with a higher Sharpe ratio.\r\n- Creating alphas with data sets that have lower turnover can reduce the average turnover of your merged P&L. If your merged P&L metrics have high turnover, you can try to improve your score by submitting alphas with lower turnover.\r\n- Go through all the available operators in the Learn section of the Brain platform, as you can implement a single idea in multiple ways through the use of diverse operators.\r\n- Avoid overfitting your alphas to in-sample performance. Overfitting may not produce good out-of-sample performance and can reduce your OS score.\r\n\r\n**Additional tips:**\r\n\r\n- Make sure to watch the Learn section videos and read the documentation. The Learn section is continually updated with new resources.\r\n- You are informed about all updates and other learning resources through the announcements section on the home page of the Brain platform.\r\n- Explore and engage with the community forum. If you have any open queries regarding alpha research or specific questions on niche aspects of the platform, it is possible that what you\u2019re looking for is already answered on the forum.\r\n- Check out the Brain Tips series on the forum. This series is regularly updated and provides useful guidance on a diverse range of topics related to alpha research.\r\n- During the alpha creation process, do not just submit the first submittable version of an alpha that improves your score. It is possible that you can improve your alpha further without overfitting, which could lead to a significant difference in your score.\r\n- If you have registered as a team, you can have different team members work on different data sets to create alphas, so your overall alpha pool has more diversity. After some time, you and your team members can switch data sets, as each person may have a different approach to creating alphas with specific data sets, potentially improving your overall team score. This can also be a good opportunity for learning and brainstorming within the team.\r\n- Organize and manage your alpha lists efficiently, as you may need to revisit your alphas as you progress through the competition. The Brain platform has features to name, color, and assign tags to your alphas to help you stay organized.\r\n- Attend webinars and Q&A sessions where experienced researchers at WorldQuant provide useful training and tips for your alpha research. You also have the opportunity to directly ask questions to the Brain team in these sessions.\r\n\r\nSo, all the best with the International Quant Championship!  \r\nWe hope you reach the top of the leaderboard.",
+        "lastModified": "2025-08-01T10:45:29.554669-04:00",
+        "highlights": [
+          {
+            "section": "transcript",
+            "content": [
+              "For price-volume data sets, keeping turnover less than or <em>close</em> to 40% is recommended, but make sure"
+            ]
+          }
+        ],
+        "videoCourse": "international-quant-championship-2026"
+      },
+      {
+        "id": "delta-financial-ratios",
+        "category": "Data",
+        "title": "Delta in Financial Ratios",
+        "uid": "Ugfn8HqB43WPNQ7UaTzDFW",
+        "numericalId": 6110666,
+        "language": "en",
+        "sequence": 1,
+        "source": "VidYard",
+        "description": "This video demonstrates how changes in financial ratios such as earnings per share (EPS) and price to earnings (P/E) generated from analyst estimates can be used to develop an alpha. \r\nThe four graphical results in the video starting at 04:12 (Alpha Coverage, Capital Distribution, PnL by Capitalization and Sharpe by Sector) are visible on the BRAIN platform only to consultants. \r\nThe simulation setting \u201cMax stock weight\u201d has been renamed to \u201cTruncation\u201d.",
+        "transcript": "In this video, we will discuss an\r\nidea that's based on the change\r\nin the financial ratio and uses\r\nthe analyst data.\r\nEarnings per share or EPS\r\nis the net earnings\r\na company makes\r\nfor each outstanding share of the\r\nstock in a given period.\r\nNet earnings are calculated after\r\na company disburses its\r\npreferred stock dividends.\r\nThe estimated earnings per share\r\nis a consensus of analyst\r\nestimates of earnings\r\nper share for a company.\r\nThe estimates are generally constructed\r\nfor the coming quarter, fiscal\r\nyear or the next fiscal year.\r\nClose over the estimated earnings\r\nper share\r\nrepresents the leading price\r\nto estimated earnings or\r\nthe P/E ratio.\r\nThis ratio tells us how\r\nmuch investors are paying for\r\neach unit of company's estimated\r\nearnings.\r\nThis is also called the premium.\r\nThe ratio is leading because it\r\nuses the expected earnings\r\nfor a future period.\r\nNow let's go through our\r\nhypothesis.\r\nThe price to earnings ratio is by\r\nnature mean-reverting ratio.\r\nWe are capturing the weekly mean\r\nreversion element of the ratio\r\nby going long on the stock\r\nwhose leading P/E ratio\r\ndecreased in the previous five days\r\nand going short on the stock whose\r\nleading P/E ratio increased\r\nin that period. Now\r\nlet's look at the implementation of\r\nthe idea.\r\nThis implementation uses two operators.\r\nThe rank operator and the\r\ndelta operator.\r\nThe rank operator ranks the\r\ninput argument of a stock\r\namong all the stocks in the universe\r\nso that the assigned value\r\nis equally distributed between zero\r\nand one.\r\nThe delta operator calculates the difference\r\nbetween the current value of\r\nthe first argument and the value\r\nobserved n days back where\r\nn is the second argument.\r\nIf the data value has been increasing\r\nwith time, the value returned\r\nby the delta operator will be positive.\r\nIf the data value has been decreasing\r\nwith time the value returned will\r\nbe negative.\r\nThe back testing simulation runs\r\nfor the previous five years to\r\ngenerate an Alpha vector for each\r\nday. If the value for the stock\r\nis negative, it shorts the stock\r\nand goes long on the stocks with\r\na positive value.\r\nFor the simulation, we are\r\nusing the top 3000\r\nU.S. stocks on the basis of\r\nliquidity.\r\nThe maximum capital any stock can\r\ntake is 1%.\r\nWe are using the data with delay one\r\nto prevent any look ahead-bias\r\nand the Alpha is neutralized over\r\nindustry.\r\nNow let's discuss how our\r\nidea gets implemented using\r\nthe expression.\r\nthe delta operator calculates\r\nthe difference in the value of the leading\r\nP/E ratio today and five\r\ndays back.\r\nThe negative sign before the delta\r\noperator is used to implement\r\na reversion idea: A stock\r\nwhose leading price to earnings\r\nratio increased in the previous\r\nfive days has negative output\r\nand vice versa. The rank operator\r\nis used to smooth the input\r\nvalue and returns an\r\nequally distributed number between\r\nzero and one for\r\nall the stocks in the universe.\r\nWhen we look at the results, the\r\nSharpe is around 1.8.\r\nThe returns-to-drawdown ratio is approximately\r\ntwo and the turnover is around\r\n40%.\r\nLet's take a look at the detailed performance\r\nparameters.\r\nWe have decent coverage for this\r\nidea across this elected universe.\r\nThe PnL generated is distributed\r\nevenly across the capitalization\r\ngroups, showing that performance\r\nis diversified across equity\r\ncapitalizations.\r\nThe capital distribution across industries\r\nis evenly distributed.\r\nAnd finally looking at the Sharpe\r\nacross different sectors, we see\r\nthat the idea has decent predictability\r\nacross various sectors.\r\nNow, let's see how we\r\ncan improve this idea.\r\nThis idea can be further improved\r\nby incorporating the degree\r\nof dispersion in the estimates\r\nfor the earnings per share data.\r\nAlso, we can incorporate\r\nvolume data to better capture\r\nthe mean reversion patterns of\r\nthe ratio.",
+        "lastModified": "2023-04-28T11:34:31.373130-04:00",
+        "highlights": [
+          {
+            "section": "transcript",
+            "content": [
+              "<em>Close</em> over the estimated earnings\r\nper share\r\nrepresents the leading price\r\nto estimated earnings or"
+            ]
+          }
+        ],
+        "videoCourse": "analyst-data"
+      }
+    ]
+  },
+  "recommendedReading": {
+    "count": 0,
+    "next": null,
+    "previous": null,
+    "results": []
+  },
+  "faq": {
+    "count": 10,
+    "next": null,
+    "previous": null,
+    "results": [
+      {
+        "id": "3-condition",
+        "category": "Operators and Functions API",
+        "sequence": 131,
+        "question": "Is it possible to construct an Alpha with 3 conditions? e.g.\r\nif (close>x) then a;\r\nif (close>y) then b;\r\notherwise c;",
+        "answer": "[{\"type\": \"TEXT\", \"value\": \"<p></p><p>Yes, you can use the conditional operator, <i>&lt;condition&gt; ? &lt;expr_true&gt; : &lt;expr_false&gt;</i>, to create nested conditions in your Alpha expression.<br/>For example:<br/><i> close &gt; x ? a : close &gt; y ? b : c</i></p>\", \"id\": \"6d60b530-3ae8-445f-9d48-3b5f9195f130\"}]",
+        "lastModified": "2022-02-23T02:31:07.480003-05:00",
+        "highlights": [
+          {
+            "section": "question",
+            "content": [
+              "if (<em>close</em>>x) then a;\r\nif (<em>close</em>>y) then b;\r\notherwise c;"
+            ]
+          },
+          {
+            "section": "answer",
+            "content": [
+              "<br/>For example:<br/><i> <em>close</em> &gt; x ? a : <em>close</em> &gt; y ? b : c</i></p>"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "delay-decay",
+        "category": "Operators and Functions API",
+        "sequence": 141,
+        "question": "Difference between delay and decay in terms of no of days?",
+        "answer": "[{\"type\": \"TEXT\", \"value\": \"<p>ts_delay(close,5) means the close price 5 day ago. Whereas ts_decay_linear(close,5) is the time averaged value of the close price over the last 5 days.</p>\", \"id\": \"47660af6-d685-4fd3-8471-af61ad01fbaa\"}]",
+        "lastModified": "2021-12-23T01:49:22.280406-05:00",
+        "highlights": [
+          {
+            "section": "answer",
+            "content": [
+              "<p>ts_delay(<em>close</em>,5) means the <em>close</em> price 5 day ago.",
+              "Whereas ts_decay_linear(<em>close</em>,5) is the time averaged value of the <em>close</em> price over the last 5 days."
+            ]
+          }
+        ]
+      },
+      {
+        "id": "full-expression-pnl",
+        "category": "Alpha Performance",
+        "sequence": 79,
+        "question": "What is the full expression of PnL?",
+        "answer": "[{\"type\": \"TEXT\", \"value\": \"<p> </p><p>Profit and Loss (PnL) is the money that  the positions and trades generate (which means it is the amount of money  you lost or made during the year), expressed in dollars.</p><p><b><i>daily_PnL = sum of (position * daily_return)</i></b></p><p>(the daily return is per instrument <b><i>(today\\u2019s close / yesterday\\u2019s close) \\u2013 1.0)</i></b></p>\", \"id\": \"735a8f77-93a2-453e-9f15-46a50dc3b5d5\"}]",
+        "lastModified": "2019-01-11T02:44:15.696803-05:00",
+        "highlights": [
+          {
+            "section": "answer",
+            "content": [
+              "= sum of (position * daily_return)</i></b></p><p>(the daily return is per instrument <b><i>(today\u2019s <em>close</em>",
+              "/ yesterday\u2019s <em>close</em>) \u2013 1.0)</i></b></p>"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "how-does-scale-function-work",
+        "category": "Operators",
+        "sequence": 182,
+        "question": "I want to know how scale(x, scale=1, longscale=1, shortscale=1) function can be used? What does it mean by the definition given in the BRAIN platform document?\r\n(((scale(x, scale=1, longscale=1, shortscale=1)-Scale Alpha x so that its Book size is 1, i.e., the sum of abs(x) over all instruments is 1. To scale to a different book size, say 1000, use scale(x, scale =1000, longscale=1, shortscale=1) * 1000)))",
+        "answer": "[{\"type\": \"TEXT\", \"value\": \"<p>Let\\u2019s take an example: suppose close data comprises of 4 close prices(for 4 tickers on 1 date). ie. close=(1, 8, 4, 7)<br/>If close is scaled, the each element of close will be divided by the row&#x27;s summation. ie. 1+8+4+7=20<br/>Therefore scale(close)=(1/20, 8/20, 4/20, 7/20)<br/>This can be multiplied by a quantity or left as it is.<br/> Scaling is done for normalization of data.</p>\", \"id\": \"d73a7537-b951-4fdd-9093-aecb259aaec8\"}]",
+        "lastModified": "2021-12-23T02:56:45.989892-05:00",
+        "highlights": [
+          {
+            "section": "answer",
+            "content": [
+              "<p>Let\u2019s take an example: suppose <em>close</em> data comprises of 4 <em>close</em> prices(for 4 tickers on 1 date). ie",
+              ". <em>close</em>=(1, 8, 4, 7)<br/>If <em>close</em> is scaled, the each element of <em>close</em> will be divided by the row&#x27",
+              ";s summation. ie. 1+8+4+7=20<br/>Therefore scale(<em>close</em>)=(1/20, 8/20, 4/20, 7/20)<br/>This can be multiplied"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "conditional-expression",
+        "category": "Operators and Functions API",
+        "sequence": 139,
+        "question": "Is it necessary for Alpha expressions to be one liner unconditioned? Depending on previous performance, can be have different sets of Alpha expressions for different performances and if yes , how to write those type of conditional Alpha expressions in the Brain platform simulator.",
+        "answer": "[{\"type\": \"TEXT\", \"value\": \"<p></p><p>You can like conditional Alpha expression using the conditional operator &lt;condition&gt;?&lt;expr_true&gt;:&lt;expr_false&gt;. It can be used to define if..else.. like constructs.<br/>For example:<br/>close &gt; open ? 0.5*(high - low) : vwap - close<br/>this is equivalent to<br/>if (close &gt; open) then<br/> Alpha = 0.5 * (high - low)<br/>else<br/> Alpha = vwap - close.</p><p>You can combine multiple conditional operators, if you want nested conditions. For example:<br/>close &gt; open ? (high / low &gt; 1.25 ? close - open : 0.5 * (high - low) ) : vwap - close<br/>this is equivalent to:<br/>if (close &gt; open) then<br/> if (high / low &gt; 1.25) then<br/> Alpha = close - open<br/> else<br/> Alpha = 0.5 * (high - low)<br/>else<br/> Alpha = vwap - close</p>\", \"id\": \"f0c84356-33f4-4363-9ccd-f937ad8819db\"}]",
+        "lastModified": "2022-02-23T02:33:56.082331-05:00",
+        "highlights": [
+          {
+            "section": "answer",
+            "content": [
+              "<br/>For example:<br/><em>close</em> &gt; open ?",
+              "0.5*(high - low) : vwap - <em>close</em><br/>this is equivalent to<br/>if (<em>close</em> &gt; open) then<br/> Alpha =",
+              "0.5 * (high - low)<br/>else<br/> Alpha = vwap - <em>close</em>.",
+              "<em>close</em> - open : 0.5 * (high - low) ) : vwap - <em>close</em><br/>this is equivalent to:<br/>if (<em>close</em> &gt; open",
+              "- low)<br/>else<br/> Alpha = vwap - <em>close</em></p>"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "zero-pnl",
+        "category": "Alpha Expressions",
+        "sequence": 158,
+        "question": "Why am I getting \"0\" PnL for Alpha = ts_decay_exp_window(close, 5, 1)- ts_decay_exp_window(close, 20, 1). This should not be the case.  I am trying MACD oscillator.",
+        "answer": "[{\"type\": \"TEXT\", \"value\": \"<p> ts_decay_exp_window (close, 5, 1) and  ts_decay_exp_window p(close, 20, 1) are highly correlated with each other and that&#x27;s why on subtraction, you are getting 0 PnL. If smoothing factor=1, then correlation would be infinite. Try lowering it to 0.5. It should be &lt;1.<br/>You will get a PnL graph for  ts_decay_exp_window (close, 5, 0.5) -  ts_decay_exp_window p(close, 20, 0.5)</p>\", \"id\": \"fd28f16c-c7ab-451c-9622-3fa1343bd401\"}]",
+        "lastModified": "2021-12-23T03:23:09.234717-05:00",
+        "highlights": [
+          {
+            "section": "question",
+            "content": [
+              "Why am I getting \"0\" PnL for Alpha = ts_decay_exp_window(<em>close</em>, 5, 1)- ts_decay_exp_window(<em>close</em>, 20,"
+            ]
+          },
+          {
+            "section": "answer",
+            "content": [
+              "<p> ts_decay_exp_window (<em>close</em>, 5, 1) and  ts_decay_exp_window p(<em>close</em>, 20, 1) are highly correlated",
+              "<br/>You will get a PnL graph for  ts_decay_exp_window (<em>close</em>, 5, 0.5) -  ts_decay_exp_window p(<em>close</em>"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "info-about-stock-weight",
+        "category": "Brain and Alphas",
+        "sequence": 91,
+        "question": "Even after searching a lot, I am unable to find out more information about stock weights. Can you please provide more information about the same?",
+        "answer": "[{\"type\": \"TEXT\", \"value\": \"<p></p><p>Alpha value for a stock represents the weight of that particular stock in the complete portfolio. This is how it works:</p><p>1) You use an Alpha expression to assign Alpha values for each stock in the universe.<br/>2) Operations like neutralization, decay are then applied on these Alpha values as specified by the user.<br/>3) These new Alpha values assigned to each stock are then converted to the amount of money allocated to a stock by scaling it to booksize.</p><p>This stock weight is thus nothing but the weight of the stock in the overall portfolio.</p><p>Let me give you a simple example, when Alpha = close.<br/>Suppose you have a universe, with just 5 stocks (A, B, C, D,E) and on a particular date (20100104) they have the following close prices (in USD):</p><p>Instruments: A B C D E</p><p>close: 6 5 2 8 4<br/></p><p>Now, you want to use the value of these close prices to calculate Alpha weights on the next trading day. You first start with the Alpha expression, which is Alpha = close. So you first make a vector of &quot;close&quot;. i.e. (6, 5, 2, 8, 4). [Note: If your expression were Alpha = 1 / close, you&#x27;d have made a vector of &quot;1 / close&quot;, i.e. (1/6, 1/5, 1/2, 1/8, 1/4) = (0.167, 0.2, 0.5, 0.125, 0.25). ]</p><p>Now you have the vector (6, 5, 2, 8, 4), this is not a vector of weights. A vector of weights needs to be normalized to 1. So we divide each element by the sum (= 25), so the sum of the elements equals 1.<br/>So the new vector is: (6 / 25, 5 / 25, 2 / 25, 8 / 25, 4 / 25) = (0.24, 0.20, 0.08, 0.32, 0.16). The sum of this vector is 1. And this is our portfolio. We multiply this by the booksize (20 Million), and we get the amount of money we want to bet on each of the stocks.</p><p>This was the case when we have set Neutralization = &quot;None&quot;. But this makes our strategy ride on market-risk. So, we select Neutralization = &quot;Market&quot;. In this case again, we start out by creating a vector of &quot;close&quot; = (6, 5, 2, 8, 4).<br/>Now we make it &quot;mean-neutral&quot;, i.e subtract the mean (= 5) from each of the elements, making the sum of the vector = 0.<br/>So the mean-neutral vector is: (1, 0, -3, 3, -1). You can see the sum of the elements is zero.</p><p>Now, in order to normalize, we need to ignore the sign and make the sum of elements = 1. So we calculate the sum of absolute values (= 1 + 0 + 3 + 3 + 1 = 8). Now we divide each element by this sum, giving us (1 / 8, 0 / 8, -3 / 8, 3 / 8, -1 / 8) = (+0.125, 0, -0.375, +0.375, -0.125).<br/>Now this is a normalized mean-neutral vector of weights. We multiply this by the booksize of 20 Million USD to get the amount we want to invest on each of the stocks, where a positive sign indicates taking long position and negative sign indicates taking short position. Also, since the positive values add up to +0.5 and the negative values add up to -0.5, we end up investing 10 Million in long and 10 Million in short positions, making the strategy dollar neutral as required.</p>\", \"id\": \"e75b4aad-5659-402a-baab-de6bab08b1ad\"}]",
+        "lastModified": "2022-02-22T16:02:54.834392-05:00",
+        "highlights": [
+          {
+            "section": "answer",
+            "content": [
+              "</p><p>Let me give you a simple example, when Alpha = <em>close</em>.",
+              "the value of these <em>close</em> prices to calculate Alpha weights on the next trading day.",
+              "You first start with the Alpha expression, which is Alpha = <em>close</em>.",
+              "So you first make a vector of &quot;<em>close</em>&quot;. i.e. (6, 5, 2, 8, 4).",
+              "[Note: If your expression were Alpha = 1 / <em>close</em>, you&#x27;d have made a vector of &quot;1 / <em>close</em>&quot"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "min",
+        "category": "Operators and Functions API",
+        "sequence": 138,
+        "question": "What is the meaning of x and y in min(x,y)?",
+        "answer": "[{\"type\": \"TEXT\", \"value\": \"<p>Min(x,y) calculates parallel minimum of vectors x and y (similar to the pmin function in R). This takes 2 vectors as arguments and returns a single vector giving the \\u2018parallel\\u2019 minima of the vectors. The first element of the result is the minimum of the first elements of all the arguments, the second element of the result is the minimum of the second elements of all the arguments and so on. eg: min(0.5*(open+close), high)<br/>This expression takes the parallel Minimum of vectors high and the vector resulting from halving the sum of vectors open and close.</p>\", \"id\": \"bb34f172-7043-4dde-a4bd-6cb04ad50a6e\"}]",
+        "lastModified": "2021-12-22T02:45:14.611799-05:00",
+        "highlights": [
+          {
+            "section": "answer",
+            "content": [
+              "the result is the minimum of the second elements of all the arguments and so on. eg: min(0.5*(open+<em>close</em>",
+              "parallel Minimum of vectors high and the vector resulting from halving the sum of vectors open and <em>close</em>"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "fractional-para-in-decay",
+        "category": "Operators and Functions API",
+        "sequence": 145,
+        "question": "I found that if the f factor in the ts_decay_exp_window  is a fractional number, then the pnl of Alpha (ts_decay_exp_window(Close,5,2/13)) will be 0. When substitute 2/13 to 0.15, it become normal. I think this is a bug in the BRAIN platform",
+        "answer": "[{\"type\": \"TEXT\", \"value\": \"<p>No, it&#x27;s not a bug. Subexpressions are not allowed while using BRAIN platform functions. eg: expressions like ts_delay(close,2+1), ts_decay_exp_window(Close,13,2/13) etc give 0 PnL.<br/>We will add the subexpression feature in the next release of BRAIN platform!<br/>Until then, please evaluate and use constants instead.</p>\", \"id\": \"6ccbb438-e720-452c-809d-cf2eeee416b1\"}]",
+        "lastModified": "2021-12-29T07:24:46.076549-05:00",
+        "highlights": [
+          {
+            "section": "question",
+            "content": [
+              "factor in the ts_decay_exp_window  is a fractional number, then the pnl of Alpha (ts_decay_exp_window(<em>Close</em>"
+            ]
+          },
+          {
+            "section": "answer",
+            "content": [
+              "Subexpressions are not allowed while using BRAIN platform functions. eg: expressions like ts_delay(<em>close</em>",
+              ",2+1), ts_decay_exp_window(<em>Close</em>,13,2/13) etc give 0 PnL."
+            ]
+          }
+        ]
+      },
+      {
+        "id": "access-list-all-var-func",
+        "category": "Data API",
+        "sequence": 102,
+        "question": "Where can I access the list of all variables(e.g. close, open) and functions(e.g. min, max)?",
+        "answer": "[{\"type\": \"TEXT\", \"value\": \"<p>In <a href=\\\"https://platform.worldquantbrain.com/learn/data-and-operators/datasets\\\">Available Datasets</a> and <a href=\\\"https://platform.worldquantbrain.com/learn/data-and-operators/operators\\\">Available Operators</a> sections in BRAIN platform, you can see all available variables and operators. Furthermore, <a href=\\\"https://platform.worldquantbrain.com/learn/documentation/create-alphas/example-expression-alphas\\\">Alpha Examples</a> page shows you how to use these data and functions in expressions.</p>\", \"id\": \"438d4ab4-d897-4dd8-94d2-6ffc2a93a757\"}]",
+        "lastModified": "2022-02-22T11:46:24.761628-05:00",
+        "highlights": [
+          {
+            "section": "question",
+            "content": [
+              "Where can I access the list of all variables(e.g. <em>close</em>, open) and functions(e.g. min, max)?"
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}
