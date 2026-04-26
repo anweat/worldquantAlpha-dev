@@ -1,0 +1,222 @@
+{
+  "dry_run": false,
+  "migration_trace_id": "tr_legacy_migration_1777226446",
+  "started_at": "2026-04-26T18:00:46Z",
+  "log": [
+    "Discovered 4 DBs, 249 JSONs, 16 MDs, 2 PDFs",
+    "  alpha_kb.db: found 1256 alpha rows",
+    "  unified_kb.db: found 1256 alpha rows",
+    "  session.json: already at .state/ — no action needed",
+    "  credentials.json: already at .state/ — no action needed",
+    "  Session file readable; has_cookies=True",
+    "  Crawl docs: 89 from DB, 45 from JSON/MD",
+    "  MD files: 16 copied to memory/_legacy/",
+    "  PDFs: 2 copied to data/legacy/pdfs/"
+  ],
+  "errors": [],
+  "discovery": {
+    "counts": {
+      "dbs": 4,
+      "jsons": 249,
+      "mds": 16,
+      "pdfs": 2
+    },
+    "db_info": [
+      {
+        "path": "archive\\2026-04-26_pre_bus\\data_and_memory\\alpha_kb.db",
+        "tables": [
+          {
+            "table": "alphas",
+            "rows": 1256
+          },
+          {
+            "table": "expr_hashes",
+            "rows": 1886
+          },
+          {
+            "table": "daily_stats",
+            "rows": 2
+          },
+          {
+            "table": "learnings",
+            "rows": 65
+          },
+          {
+            "table": "submission_queue",
+            "rows": 104
+          }
+        ]
+      },
+      {
+        "path": "archive\\2026-04-26_pre_bus\\data_and_memory\\crawl_state.db",
+        "tables": [
+          {
+            "table": "crawl_queue",
+            "rows": 89
+          },
+          {
+            "table": "crawl_links",
+            "rows": 0
+          },
+          {
+            "table": "alpha_ideas",
+            "rows": 0
+          }
+        ]
+      },
+      {
+        "path": "archive\\2026-04-26_pre_bus\\data_and_memory\\memory_kb.db",
+        "tables": [
+          {
+            "table": "memories",
+            "rows": 0
+          },
+          {
+            "table": "memory_changelog",
+            "rows": 4
+          }
+        ]
+      },
+      {
+        "path": "archive\\2026-04-26_pre_bus\\data_and_memory\\unified_kb.db",
+        "tables": [
+          {
+            "table": "crawl_queue",
+            "rows": 89
+          },
+          {
+            "table": "crawl_links",
+            "rows": 0
+          },
+          {
+            "table": "alphas",
+            "rows": 1256
+          },
+          {
+            "table": "expr_hashes",
+            "rows": 1256
+          },
+          {
+            "table": "submission_queue",
+            "rows": 0
+          },
+          {
+            "table": "learnings",
+            "rows": 0
+          },
+          {
+            "table": "daily_stats",
+            "rows": 2
+          },
+          {
+            "table": "alpha_ideas",
+            "rows": 0
+          }
+        ]
+      }
+    ],
+    "json_buckets": {
+      "crawl-doc": 132,
+      "pipeline-state": 5,
+      "unknown": 6,
+      "submission-queue": 3,
+      "alpha-list": 94,
+      "portfolio": 5,
+      "failure": 4
+    },
+    "md_count": 16,
+    "pdf_count": 2
+  },
+  "alpha_migration": [
+    {
+      "source": "archive\\2026-04-26_pre_bus\\data_and_memory\\alpha_kb.db",
+      "found": 1256,
+      "inserted": 1256,
+      "skipped": 0,
+      "errors": []
+    },
+    {
+      "source": "archive\\2026-04-26_pre_bus\\data_and_memory\\unified_kb.db",
+      "found": 1256,
+      "inserted": 1256,
+      "skipped": 0,
+      "errors": []
+    },
+    {
+      "source": "archive\\2026-04-26_pre_bus\\data_and_memory\\unsubmitted_alphas_all.json",
+      "found": 135,
+      "inserted": 135,
+      "skipped": 0
+    },
+    {
+      "source": "archive\\2026-04-26_pre_bus\\data_and_memory\\unsubmitted_alphas.json",
+      "found": 100,
+      "inserted": 100,
+      "skipped": 0
+    }
+  ],
+  "session_migration": {
+    "actions": [
+      "session.json: already in .state/ (legacy source not found)",
+      "credentials.json: already in .state/ (legacy source not found)"
+    ],
+    "auth_check": "session_file_readable_with_cookies"
+  },
+  "crawl_migration": {
+    "from_db": {
+      "found": 89,
+      "inserted": 89,
+      "errors": []
+    },
+    "from_json": {
+      "found": 45,
+      "inserted": 45,
+      "errors": []
+    },
+    "crawl_summaries_inserted": 1,
+    "md_crawl_docs": {
+      "found": 1,
+      "inserted": 1
+    }
+  },
+  "md_copy": {
+    "copied": 16,
+    "skipped": 0,
+    "paths": [
+      "memory\\_legacy\\2026-04-26_pre_bus\\README.md",
+      "memory\\_legacy\\2026-04-26_pre_bus\\data_and_memory\\datafields_summary.md",
+      "memory\\_legacy\\2026-04-26_pre_bus\\old_results\\factor_report.md",
+      "memory\\_legacy\\2026-04-26_pre_bus\\old_root_files\\q-a.md",
+      "memory\\_legacy\\2026-04-26_pre_bus\\old_results\\reports\\daily_2026-04-21.md",
+      "memory\\_legacy\\2026-04-26_pre_bus\\old_results\\reports\\daily_2026-04-22.md",
+      "memory\\_legacy\\2026-04-26_pre_bus\\old_results\\reports\\portfolio_2026-04-21.md",
+      "memory\\_legacy\\2026-04-26_pre_bus\\old_results\\reports\\portfolio_2026-04-22.md",
+      "memory\\_legacy\\2026-04-26_pre_bus\\old_results\\reports\\archive\\daily_2026-04-21_20260421_130100.md",
+      "memory\\_legacy\\2026-04-26_pre_bus\\old_results\\reports\\archive\\daily_2026-04-21_20260421_203553.md",
+      "memory\\_legacy\\2026-04-26_pre_bus\\old_results\\reports\\archive\\daily_2026-04-22_20260422_191428.md",
+      "memory\\_legacy\\2026-04-26_pre_bus\\data_and_memory\\memory_archive\\next_session_context_20260421_124900.md",
+      "memory\\_legacy\\2026-04-26_pre_bus\\data_and_memory\\memory_archive\\next_session_context_20260421_130100.md",
+      "memory\\_legacy\\2026-04-26_pre_bus\\data_and_memory\\memory_archive\\next_session_context_20260421_203553.md",
+      "memory\\_legacy\\2026-04-26_pre_bus\\data_and_memory\\memory_archive\\next_session_context_20260422_123001.md",
+      "memory\\_legacy\\2026-04-26_pre_bus\\data_and_memory\\memory_archive\\next_session_context_20260422_191428.md"
+    ]
+  },
+  "pdf_copy": {
+    "copied": 2,
+    "events_emitted": 2,
+    "paths": [
+      "data\\legacy\\pdfs\\ssrn-2701346.pdf",
+      "data\\legacy\\pdfs\\ssrn-3267337.pdf"
+    ]
+  },
+  "finished_at": "2026-04-26T18:00:48Z",
+  "summary": {
+    "total_alphas_inserted": 2747,
+    "total_crawl_docs_inserted": 135,
+    "crawl_summaries_placeholder": 1,
+    "md_files_copied": 16,
+    "pdf_files_copied": 2,
+    "total_errors": 0
+  },
+  "drain_docs_instruction": "To summarize legacy crawl docs: run `wqbus drain-docs --dataset USA_TOP3000 --max-batches 5`"
+}

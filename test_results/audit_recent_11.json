@@ -1,0 +1,364 @@
+{
+  "generated_at": "2026-04-26T18:12:58Z",
+  "mode": "recent_20",
+  "nodes": [
+    {
+      "trace_id": "tr_20260426T181046Z_53a83c",
+      "task_kind": "alpha_gen",
+      "status": "running",
+      "parent_trace_id": null,
+      "expects_ai_call": true,
+      "checks": {
+        "events": {
+          "pass": true,
+          "count": 1
+        },
+        "ai_calls": {
+          "ai_call_count": 0,
+          "manual_call_count": 0,
+          "total": 0,
+          "package_ids": []
+        },
+        "logs": {
+          "found": true,
+          "files_searched": 67,
+          "found_in": [
+            "logs\\wqbus.log"
+          ]
+        },
+        "alpha_drafted_event": false
+      },
+      "issues": [
+        "Task kind 'alpha_gen' expects AI call but none found for trace_id=tr_20260426T181046Z_53a83c"
+      ],
+      "pass": true
+    },
+    {
+      "trace_id": "tr_20260426T180846Z_ae8a40",
+      "task_kind": "alpha_gen",
+      "status": "running",
+      "parent_trace_id": null,
+      "expects_ai_call": true,
+      "checks": {
+        "events": {
+          "pass": true,
+          "count": 1
+        },
+        "ai_calls": {
+          "ai_call_count": 0,
+          "manual_call_count": 0,
+          "total": 0,
+          "package_ids": []
+        },
+        "logs": {
+          "found": true,
+          "files_searched": 67,
+          "found_in": [
+            "logs\\wqbus.log"
+          ]
+        },
+        "alpha_drafted_event": false
+      },
+      "issues": [
+        "Task kind 'alpha_gen' expects AI call but none found for trace_id=tr_20260426T180846Z_ae8a40"
+      ],
+      "pass": true
+    },
+    {
+      "trace_id": "tr_20260426T180646Z_79db13",
+      "task_kind": "alpha_gen",
+      "status": "running",
+      "parent_trace_id": null,
+      "expects_ai_call": true,
+      "checks": {
+        "events": {
+          "pass": true,
+          "count": 1
+        },
+        "ai_calls": {
+          "ai_call_count": 0,
+          "manual_call_count": 0,
+          "total": 0,
+          "package_ids": []
+        },
+        "logs": {
+          "found": true,
+          "files_searched": 67,
+          "found_in": [
+            "logs\\wqbus.log"
+          ]
+        },
+        "alpha_drafted_event": false
+      },
+      "issues": [
+        "Task kind 'alpha_gen' expects AI call but none found for trace_id=tr_20260426T180646Z_79db13"
+      ],
+      "pass": true
+    },
+    {
+      "trace_id": "tr_20260426T180446Z_3ec4e7",
+      "task_kind": "alpha_gen",
+      "status": "running",
+      "parent_trace_id": null,
+      "expects_ai_call": true,
+      "checks": {
+        "events": {
+          "pass": true,
+          "count": 1
+        },
+        "ai_calls": {
+          "ai_call_count": 0,
+          "manual_call_count": 0,
+          "total": 0,
+          "package_ids": []
+        },
+        "logs": {
+          "found": true,
+          "files_searched": 67,
+          "found_in": [
+            "logs\\wqbus.log"
+          ]
+        },
+        "alpha_drafted_event": false
+      },
+      "issues": [
+        "Task kind 'alpha_gen' expects AI call but none found for trace_id=tr_20260426T180446Z_3ec4e7"
+      ],
+      "pass": true
+    },
+    {
+      "trace_id": "tr_20260426T180246Z_431fa4",
+      "task_kind": "alpha_gen",
+      "status": "running",
+      "parent_trace_id": null,
+      "expects_ai_call": true,
+      "checks": {
+        "events": {
+          "pass": true,
+          "count": 1
+        },
+        "ai_calls": {
+          "ai_call_count": 0,
+          "manual_call_count": 0,
+          "total": 0,
+          "package_ids": []
+        },
+        "logs": {
+          "found": true,
+          "files_searched": 67,
+          "found_in": [
+            "logs\\wqbus.log"
+          ]
+        },
+        "alpha_drafted_event": false
+      },
+      "issues": [
+        "Task kind 'alpha_gen' expects AI call but none found for trace_id=tr_20260426T180246Z_431fa4"
+      ],
+      "pass": true
+    },
+    {
+      "trace_id": "tr_20260426T174932Z_4aa156",
+      "task_kind": "parent_task",
+      "status": "running",
+      "parent_trace_id": null,
+      "expects_ai_call": false,
+      "checks": {
+        "events": {
+          "pass": false,
+          "count": 0
+        },
+        "ai_calls": {
+          "ai_call_count": 0,
+          "manual_call_count": 0,
+          "total": 0,
+          "package_ids": []
+        },
+        "logs": {
+          "found": false,
+          "files_searched": 67,
+          "found_in": []
+        },
+        "alpha_drafted_event": false
+      },
+      "issues": [
+        "NO events for trace_id=tr_20260426T174932Z_4aa156 (task_kind=parent_task)",
+        "trace_id=tr_20260426T174932Z_4aa156 not found in any log file (67 files searched)"
+      ],
+      "pass": false
+    },
+    {
+      "trace_id": "tr_20260426T174932Z_ecffbc",
+      "task_kind": "child_task",
+      "status": "running",
+      "parent_trace_id": "tr_20260426T174932Z_4aa156",
+      "expects_ai_call": false,
+      "checks": {
+        "events": {
+          "pass": true,
+          "count": 1
+        },
+        "ai_calls": {
+          "ai_call_count": 0,
+          "manual_call_count": 0,
+          "total": 0,
+          "package_ids": []
+        },
+        "logs": {
+          "found": true,
+          "files_searched": 67,
+          "found_in": [
+            "logs\\wqbus.log"
+          ]
+        },
+        "alpha_drafted_event": false
+      },
+      "issues": [],
+      "pass": true
+    },
+    {
+      "trace_id": "tr_20260426T174626Z_34b933",
+      "task_kind": "alpha_gen",
+      "status": "running",
+      "parent_trace_id": null,
+      "expects_ai_call": true,
+      "checks": {
+        "events": {
+          "pass": true,
+          "count": 1
+        },
+        "ai_calls": {
+          "ai_call_count": 0,
+          "manual_call_count": 0,
+          "total": 0,
+          "package_ids": []
+        },
+        "logs": {
+          "found": true,
+          "files_searched": 67,
+          "found_in": [
+            "logs\\wqbus.log"
+          ]
+        },
+        "alpha_drafted_event": false
+      },
+      "issues": [
+        "Task kind 'alpha_gen' expects AI call but none found for trace_id=tr_20260426T174626Z_34b933"
+      ],
+      "pass": true
+    },
+    {
+      "trace_id": "tr_20260426T174426Z_f33fe0",
+      "task_kind": "alpha_gen",
+      "status": "running",
+      "parent_trace_id": null,
+      "expects_ai_call": true,
+      "checks": {
+        "events": {
+          "pass": true,
+          "count": 1
+        },
+        "ai_calls": {
+          "ai_call_count": 0,
+          "manual_call_count": 0,
+          "total": 0,
+          "package_ids": []
+        },
+        "logs": {
+          "found": true,
+          "files_searched": 67,
+          "found_in": [
+            "logs\\wqbus.log"
+          ]
+        },
+        "alpha_drafted_event": false
+      },
+      "issues": [
+        "Task kind 'alpha_gen' expects AI call but none found for trace_id=tr_20260426T174426Z_f33fe0"
+      ],
+      "pass": true
+    },
+    {
+      "trace_id": "tr_20260426T174420Z_c3e46a",
+      "task_kind": "parent_task",
+      "status": "running",
+      "parent_trace_id": null,
+      "expects_ai_call": false,
+      "checks": {
+        "events": {
+          "pass": false,
+          "count": 0
+        },
+        "ai_calls": {
+          "ai_call_count": 0,
+          "manual_call_count": 0,
+          "total": 0,
+          "package_ids": []
+        },
+        "logs": {
+          "found": false,
+          "files_searched": 67,
+          "found_in": []
+        },
+        "alpha_drafted_event": false
+      },
+      "issues": [
+        "NO events for trace_id=tr_20260426T174420Z_c3e46a (task_kind=parent_task)",
+        "trace_id=tr_20260426T174420Z_c3e46a not found in any log file (67 files searched)"
+      ],
+      "pass": false
+    },
+    {
+      "trace_id": "tr_20260426T174420Z_9e21cd",
+      "task_kind": "child_task",
+      "status": "running",
+      "parent_trace_id": "tr_20260426T174420Z_c3e46a",
+      "expects_ai_call": false,
+      "checks": {
+        "events": {
+          "pass": true,
+          "count": 1
+        },
+        "ai_calls": {
+          "ai_call_count": 0,
+          "manual_call_count": 0,
+          "total": 0,
+          "package_ids": []
+        },
+        "logs": {
+          "found": true,
+          "files_searched": 67,
+          "found_in": [
+            "logs\\wqbus.log"
+          ]
+        },
+        "alpha_drafted_event": false
+      },
+      "issues": [],
+      "pass": true
+    }
+  ],
+  "summary": {
+    "total_nodes": 11,
+    "passed": 9,
+    "failed": 2,
+    "pass_rate_pct": 81.8,
+    "nodes_with_events": 9,
+    "nodes_with_ai_calls": 0,
+    "nodes_with_log_evidence": 9,
+    "all_issues": [
+      "Task kind 'alpha_gen' expects AI call but none found for trace_id=tr_20260426T181046Z_53a83c",
+      "Task kind 'alpha_gen' expects AI call but none found for trace_id=tr_20260426T180846Z_ae8a40",
+      "Task kind 'alpha_gen' expects AI call but none found for trace_id=tr_20260426T180646Z_79db13",
+      "Task kind 'alpha_gen' expects AI call but none found for trace_id=tr_20260426T180446Z_3ec4e7",
+      "Task kind 'alpha_gen' expects AI call but none found for trace_id=tr_20260426T180246Z_431fa4",
+      "NO events for trace_id=tr_20260426T174932Z_4aa156 (task_kind=parent_task)",
+      "trace_id=tr_20260426T174932Z_4aa156 not found in any log file (67 files searched)",
+      "Task kind 'alpha_gen' expects AI call but none found for trace_id=tr_20260426T174626Z_34b933",
+      "Task kind 'alpha_gen' expects AI call but none found for trace_id=tr_20260426T174426Z_f33fe0",
+      "NO events for trace_id=tr_20260426T174420Z_c3e46a (task_kind=parent_task)",
+      "trace_id=tr_20260426T174420Z_c3e46a not found in any log file (67 files searched)"
+    ]
+  },
+  "status": "WARN"
+}
