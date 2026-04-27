@@ -54,11 +54,21 @@ class EventBus:
         handlers = list(self._handlers.get(event.topic, []))
         if not handlers:
             log.debug("no handlers for %s", event.topic)
+            # No handlers will run, so check terminal closure now.
+            self._maybe_close_trace_safe(event)
             return
-        for h in handlers:
-            task = asyncio.create_task(self._run_handler(h, event))
-            self._tasks.add(task)
-            task.add_done_callback(self._tasks.discard)
+        # Schedule handlers; defer terminal-trace closure until they finish so
+        # CLI-emitted terminal topics don't close the trace before the agent
+        # handler has a chance to run.
+        async def _run_then_close():
+            await asyncio.gather(
+                *(self._run_handler(h, event) for h in handlers),
+                return_exceptions=True,
+            )
+            self._maybe_close_trace_safe(event)
+        task = asyncio.create_task(_run_then_close())
+        self._tasks.add(task)
+        task.add_done_callback(self._tasks.discard)
 
     async def emit_and_wait(self, event: Event) -> None:
         """Await all handlers. Exceptions are logged, not re-raised."""
@@ -68,6 +78,7 @@ class EventBus:
             *(self._run_handler(h, event) for h in handlers),
             return_exceptions=True,
         )
+        self._maybe_close_trace_safe(event)
 
     async def drain(self, timeout: Optional[float] = None) -> None:
         """Wait for all in-flight background tasks to finish, including
@@ -126,7 +137,14 @@ class EventBus:
             mirror_event(event)
         except Exception:  # noqa: BLE001
             log.exception("failed to mirror critical event %s", event.topic)
-        # Auto-close trace status for known terminal topics (no-op if no trace).
+        # Hard signals (TASK_FAILED/TASK_COMPLETED) close immediately; soft
+        # terminal topics are deferred to after handlers run (see emit()).
+        try:
+            self._maybe_close_trace_hard(event)
+        except Exception:  # noqa: BLE001
+            log.exception("failed to hard-close trace for %s", event.topic)
+
+    def _maybe_close_trace_safe(self, event: Event) -> None:
         try:
             self._maybe_close_trace(event)
         except Exception:  # noqa: BLE001
@@ -136,31 +154,19 @@ class EventBus:
     # task_kind is a *business round*, not an agent name. The agent that emits
     # the terminal topic doesn't need to know it's the last one — the bus
     # closes the trace based on this map.
-    _TERMINAL_TOPICS_BY_KIND: dict[str, set[str]] = {
-        # alpha_round = failure_synth → alpha_gen → sim_executor → (submitter)
-        # sim_executor's BATCH_DONE is the canonical terminal; SUBMITTED also
-        # closes for rounds that culminate in submission.
-        "alpha_round":    {"BATCH_DONE", "SUBMITTED", "SUBMISSION_FAILED"},
-        # crawl_summary = a single crawler run; closed manually by the
-        # crawler driver (no natural terminal topic in the bus).
-        "crawl_summary":  set(),
-        # doc_summary = doc_summarizer consuming a batch (parent=crawl_summary)
-        "doc_summary":    {"KNOWLEDGE_UPDATED", "RECIPE_CANDIDATES_READY",
-                           "RECIPE_PROPOSED"},
-        # health_probe = one probe; HEALTH_PROBE_DONE closes it.
-        "health_probe":   {"HEALTH_PROBE_DONE"},
-        # portfolio_review = an analyst pass over the portfolio
-        "portfolio_review": {"PORTFOLIO_ANALYZED"},
-    }
+    #
+    # To add a new task_kind, edit the module-level TERMINAL_TOPICS_BY_KIND
+    # dict below or call register_terminal_topics(kind, topics) at startup.
+    @property
+    def _TERMINAL_TOPICS_BY_KIND(self) -> dict[str, set[str]]:
+        return TERMINAL_TOPICS_BY_KIND
 
-    def _maybe_close_trace(self, event: Event) -> None:
-        """If event is TASK_COMPLETED/TASK_FAILED OR a terminal topic for
-        the trace's task_kind, transition trace status."""
+    def _maybe_close_trace_hard(self, event: Event) -> None:
+        """Immediate close on TASK_COMPLETED / TASK_FAILED only."""
         trace_id = getattr(event, "trace_id", None)
         if not trace_id:
             return
         topic = event.topic
-        # Hard signals
         if topic == "TASK_FAILED":
             from wq_bus.bus.tasks import fail_task
             fail_task(trace_id, event.payload.get("error", "unknown"))
@@ -168,6 +174,16 @@ class EventBus:
         if topic == "TASK_COMPLETED":
             from wq_bus.bus.tasks import complete_task
             complete_task(trace_id, event.payload)
+            return
+
+    def _maybe_close_trace(self, event: Event) -> None:
+        """Deferred (post-handler) close: terminal topic for trace's task_kind."""
+        trace_id = getattr(event, "trace_id", None)
+        if not trace_id:
+            return
+        topic = event.topic
+        # Hard signals already handled in _maybe_close_trace_hard.
+        if topic in ("TASK_FAILED", "TASK_COMPLETED"):
             return
         # Soft signals: terminal topic for the trace's task_kind
         try:
@@ -185,6 +201,37 @@ class EventBus:
         if topic in terminals:
             from wq_bus.bus.tasks import complete_task
             complete_task(trace_id, {"terminal_topic": topic})
+
+
+# ---------------------------------------------------------------------------
+# Task-kind → terminal topics registry.
+#
+# Editable at runtime via register_terminal_topics(kind, topics). Plugins or
+# experimental flows can append a new kind without modifying EventBus.
+# ---------------------------------------------------------------------------
+
+TERMINAL_TOPICS_BY_KIND: dict[str, set[str]] = {
+    # alpha_round = failure_synth → alpha_gen → sim_executor → (submitter)
+    # sim_executor's BATCH_DONE is the canonical terminal; SUBMITTED also
+    # closes for rounds that culminate in submission.
+    "alpha_round":      {"BATCH_DONE", "SUBMITTED", "SUBMISSION_FAILED"},
+    # crawl_summary = a single crawler run; closed manually by the
+    # crawler driver (no natural terminal topic in the bus).
+    "crawl_summary":    set(),
+    # doc_summary = doc_summarizer consuming a batch (parent=crawl_summary)
+    "doc_summary":      {"KNOWLEDGE_UPDATED", "RECIPE_CANDIDATES_READY",
+                          "RECIPE_PROPOSED"},
+    # health_probe = one probe; HEALTH_PROBE_DONE closes it.
+    "health_probe":     {"HEALTH_PROBE_DONE"},
+    # portfolio_review = an analyst pass over the portfolio
+    "portfolio_review": {"PORTFOLIO_ANALYZED"},
+}
+
+
+def register_terminal_topics(kind: str, topics: "set[str] | list[str]") -> None:
+    """Register or extend terminal topics for a task_kind. Idempotent."""
+    existing = TERMINAL_TOPICS_BY_KIND.setdefault(kind, set())
+    existing.update(topics)
 
 
 # ----- module-level singleton -----

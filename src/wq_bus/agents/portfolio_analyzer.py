@@ -1,0 +1,81 @@
+"""portfolio_analyzer agent — runs PnL correlation + overfitting heuristics.
+
+Listens: SUBMITTED  (also callable manually via CLI)
+Emits:   PORTFOLIO_ANALYZED, optionally LEARNING_DRAFTED
+"""
+from __future__ import annotations
+
+import json
+from pathlib import Path
+from typing import TYPE_CHECKING
+
+from wq_bus.agents.base import AgentBase
+from wq_bus.analysis.overfitting_signals import analyze as analyze_overfit
+from wq_bus.analysis.pnl_correlation import compute_pairwise_corr
+from wq_bus.bus.events import Event, Topic, make_event
+
+if TYPE_CHECKING:
+    from wq_bus.brain.client import BrainClient
+
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
+MEMORY_DIR = PROJECT_ROOT / "memory"
+
+
+class PortfolioAnalyzer(AgentBase):
+    AGENT_TYPE = "portfolio_analyzer"
+    SUBSCRIPTIONS = [Topic.SUBMITTED]
+
+    def __init__(self, bus, brain_client: "BrainClient") -> None:
+        super().__init__(bus)
+        self.client = brain_client
+        self._submitted_since_last_analysis = 0
+
+    async def on_submitted(self, event: Event) -> None:
+        self._submitted_since_last_analysis += 1
+        if self._submitted_since_last_analysis < 3:
+            return
+        await self.analyze_now(event.dataset_tag)
+        self._submitted_since_last_analysis = 0
+
+    async def analyze_now(self, tag: str, *, recent_n: int | None = None) -> dict:
+        """Run pairwise PnL correlation + overfitting heuristics.
+
+        Args:
+            tag: dataset tag.
+            recent_n: cap analysis to the most recently submitted N alphas.
+                Defaults to ``analysis.portfolio_recent_n`` (yaml) or 100.
+                Pass 0 to disable the cap (dangerous on large portfolios —
+                runtime is O(n²) and each uncached PnL is one HTTP call).
+        """
+        import asyncio
+        # Resolve cap from yaml if not explicitly set
+        if recent_n is None:
+            try:
+                from wq_bus.utils.yaml_loader import load_yaml
+                ana = load_yaml("analysis") or {}
+                recent_n = int(ana.get("portfolio_recent_n", 100))
+            except Exception:
+                recent_n = 100
+        loop = asyncio.get_running_loop()
+        # PnL correlation in executor (network-heavy)
+        try:
+            corr_pairs = await loop.run_in_executor(
+                None, compute_pairwise_corr, self.client, 0.7, 100, recent_n,
+            )
+        except TypeError:
+            # function may have keyword-only args; fall back to sync direct call
+            corr_pairs = compute_pairwise_corr(self.client, recent_n=recent_n)
+        overfit = analyze_overfit()
+
+        out = {"corr_pairs": corr_pairs, "overfit": overfit}
+        out_dir = MEMORY_DIR / tag
+        out_dir.mkdir(parents=True, exist_ok=True)
+        (out_dir / "portfolio.json").write_text(
+            json.dumps(out, ensure_ascii=False, indent=2, default=str),
+            encoding="utf-8",
+        )
+        self.bus.emit(make_event(Topic.PORTFOLIO_ANALYZED, tag, **{
+            "n_high_corr_pairs": len(corr_pairs),
+            "overfit_score": overfit.get("score"),
+        }))
+        return out

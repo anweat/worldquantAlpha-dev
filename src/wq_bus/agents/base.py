@@ -74,6 +74,21 @@ class AgentBase:
         all_subs = list(self.SUBSCRIPTIONS) + [
             s for s in self.subscribes if s not in sub_values
         ]
+        # Validate against topic_registry — warn (don't raise) on unknown topics
+        # so a typo in a string-list subscription is caught early at startup
+        # rather than silently never firing.
+        try:
+            from wq_bus.bus.topic_registry import is_registered
+            for t in all_subs:
+                tname = t.value if isinstance(t, Topic) else str(t)
+                if not is_registered(tname):
+                    self.log.warning(
+                        "agent %s subscribed to unregistered topic %r — "
+                        "handler will never fire unless someone emits this exact name",
+                        self.AGENT_TYPE, tname,
+                    )
+        except Exception:  # noqa: BLE001
+            pass
         for topic in all_subs:
             self.bus.subscribe(topic, self._safe_dispatch)
         self.log.info(

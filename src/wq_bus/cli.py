@@ -285,6 +285,64 @@ def dataset_cmd(action, tag):
         click.echo(repr(next((e for e in items if (e.get("tag") if isinstance(e, dict) else e) == tag), None)))
 
 
+@cli.command("trace-prune")
+@click.option("--older-than-days", "days", type=int, required=True,
+              help="Delete completed/failed/cancelled traces older than N days.")
+@click.option("--include-events/--keep-events", default=True,
+              help="Also delete events for pruned traces (default: yes).")
+@click.option("--include-ai-calls/--keep-ai-calls", default=False,
+              help="Also delete ai_calls for pruned traces (default: keep — billing record).")
+@click.option("--dry-run", is_flag=True, help="Report what would be deleted, don't delete.")
+def trace_prune_cmd(days, include_events, include_ai_calls, dry_run):
+    """Prune old terminal traces (completed/failed/cancelled) from state.db.
+
+    Running traces are never pruned regardless of age.
+
+    Examples:
+        wqbus trace-prune --older-than-days 30 --dry-run
+        wqbus trace-prune --older-than-days 30
+        wqbus trace-prune --older-than-days 7 --include-ai-calls
+    """
+    import time as _t
+    from wq_bus.data._sqlite import open_state, ensure_migrated
+    ensure_migrated()
+    cutoff_ts = _t.time() - (days * 86400)
+    from datetime import datetime as _dt, timezone as _tz
+    cutoff_iso = _dt.fromtimestamp(cutoff_ts, _tz.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    with open_state() as conn:
+        rows = conn.execute(
+            """SELECT trace_id FROM trace
+               WHERE status IN ('completed','failed','cancelled','timeout')
+                 AND (ended_at IS NOT NULL AND ended_at < ?)""",
+            (cutoff_iso,),
+        ).fetchall()
+        trace_ids = [r["trace_id"] for r in rows]
+        n = len(trace_ids)
+        if n == 0:
+            click.echo(f"no terminal traces older than {days}d (cutoff={cutoff_iso})")
+            return
+        click.echo(f"found {n} terminal traces older than {days}d (cutoff={cutoff_iso})")
+        if dry_run:
+            for tid in trace_ids[:10]:
+                click.echo(f"  would delete: {tid}")
+            if n > 10:
+                click.echo(f"  ... and {n - 10} more")
+            return
+        # Real delete — chunk to avoid huge IN-clauses.
+        for i in range(0, n, 500):
+            chunk = trace_ids[i:i+500]
+            placeholders = ",".join(["?"] * len(chunk))
+            if include_events:
+                conn.execute(f"DELETE FROM events WHERE trace_id IN ({placeholders})", chunk)
+            if include_ai_calls:
+                conn.execute(f"DELETE FROM ai_calls WHERE trace_id IN ({placeholders})", chunk)
+            conn.execute(f"DELETE FROM trace WHERE trace_id IN ({placeholders})", chunk)
+        click.echo(f"deleted {n} traces"
+                   + (" + their events" if include_events else "")
+                   + (" + their ai_calls" if include_ai_calls else ""))
+
+
 @cli.command("trace")
 @click.argument("trace_id", required=False)
 @click.option("--alpha", default=None, help="Look up trace_id by alpha_id.")
@@ -927,6 +985,60 @@ def _kind_for_agent(agent: str) -> str:
     return _AGENT_TO_KIND.get(agent.lower(), agent.lower())
 
 
+def _instantiate_agents_for(agent: str, bus) -> list:
+    """Instantiate the agent(s) needed to handle a manual `wqbus task` trigger.
+
+    For chain-style kinds (alpha_round) we wire the *full* chain so the round
+    can iterate naturally (failure_analyzer → alpha_gen → sim_executor →
+    submitter) without missing handlers. For doc_summarizer we only need the
+    DocSummarizer itself.
+
+    Returns the list of instantiated agents (kept alive until drain finishes).
+    """
+    a = agent.lower()
+    out = []
+    try:
+        from wq_bus.brain.client import BrainClient
+    except Exception as e:
+        click.echo(f"warn: BrainClient init failed: {e}", err=True)
+        BrainClient = None  # type: ignore
+    try:
+        from wq_bus.ai.dispatcher import Dispatcher
+        disp = Dispatcher()
+    except Exception as e:
+        click.echo(f"warn: Dispatcher init failed: {e}", err=True)
+        disp = None
+
+    def _try(label, fn):
+        try:
+            out.append(fn())
+        except Exception as e:
+            click.echo(f"warn: {label} init failed: {e}", err=True)
+
+    if a in ("alpha_gen", "alpha_round", "failure_analyzer", "sim_executor",
+             "submitter"):
+        # Full alpha_round chain so a manual trigger drives end-to-end.
+        from wq_bus.agents.alpha_gen import AlphaGen
+        from wq_bus.agents.sim_executor import SimExecutor
+        from wq_bus.agents.submitter import Submitter
+        from wq_bus.agents.failure_analyzer import FailureAnalyzer
+        if disp is not None:
+            _try("AlphaGen", lambda: AlphaGen(bus, disp))
+        if BrainClient is not None:
+            _try("SimExecutor", lambda: SimExecutor(bus, BrainClient(), dispatcher=disp))
+            _try("Submitter", lambda: Submitter(bus, BrainClient()))
+        _try("FailureAnalyzer", lambda: FailureAnalyzer(bus, disp))
+    elif a.startswith("doc_summarizer") or a == "doc_summary":
+        from wq_bus.agents.doc_summarizer import DocSummarizer
+        if disp is not None:
+            _try("DocSummarizer", lambda: DocSummarizer(bus, disp))
+    elif a in ("portfolio_analyzer", "portfolio_review"):
+        from wq_bus.agents.portfolio_analyzer import PortfolioAnalyzer
+        if BrainClient is not None:
+            _try("PortfolioAnalyzer", lambda: PortfolioAnalyzer(bus, BrainClient()))
+    return out
+
+
 # Map agent name → (topic_to_emit, default_payload_builder).
 # Each builder receives (mode, url, goal, summarize, n) and returns a payload
 # dict that satisfies the required fields for that topic. Agents listening to
@@ -1075,8 +1187,20 @@ def task_cmd(ctx, agent, mode, dataset_tag, url, goal, summarize, n, output_json
                 click.echo(f"ERROR: api_healthcheck probe failed: {e}", err=True)
                 sys.exit(1)
         else:
+            # Instantiate the agent(s) so the trigger event has a handler.
+            # Without this, emit() would find 0 handlers and the deferred
+            # auto-close would still close the trace immediately.
+            bus = get_bus()
+            _instantiated = _instantiate_agents_for(agent, bus)
             ev = make_event(topic, tag, trace_id=handle.trace_id, **base_payload)
-            get_bus().emit(ev)
+            with with_trace(handle.trace_id):
+                async def _emit_and_drain():
+                    bus.emit(ev)
+                    try:
+                        await bus.drain(timeout=180)
+                    except Exception as e:
+                        click.echo(f"warn: drain failed: {e}", err=True)
+                asyncio.run(_emit_and_drain())
 
     if output_json:
         click.echo(_json.dumps({"trace_id": handle.trace_id, "agent": agent,
@@ -1161,7 +1285,7 @@ def health_cmd(ctx, dataset_tag, interval, kind, probe_expr, window_size,
         except Exception as e:
             click.echo(f"warn: AlphaGen init failed: {e}", err=True)
         try:
-            extra_agents.append(SimExecutor(bus, BrainClient()))
+            extra_agents.append(SimExecutor(bus, BrainClient(), dispatcher=disp))
         except Exception as e:
             click.echo(f"warn: SimExecutor init failed: {e}", err=True)
         try:
