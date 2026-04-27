@@ -1,0 +1,48 @@
+# crawl_targets.yaml — Crawler target definitions for wq-bus CrawlerAgent
+#
+# Each key under `targets:` is a target name passed in CRAWL_REQUESTED events.
+# Fields:
+#   url_template        - URL to fetch (may include {param} placeholders for future use)
+#   source              - credential/cookie namespace (matches .secrets/crawl_accounts.yaml)
+#   login_required      - whether to inject cookies from auth_store
+#   content_expectation - human-readable hint for the doc_summarizer agent
+#   cleaning_rules      - CSS selectors (or tag names) to REMOVE before saving
+#   trigger_threshold   - emit DOC_FETCHED batch event when pending docs >= this
+#   dataset_tag         - wq-bus dataset tag to scope knowledge_db writes
+#   type                - html | spa | pdf
+#   max_per_run         - max docs to fetch in one run (future pagination support)
+
+targets:
+
+  brain_community:
+    type: html
+    url_template: https://support.worldquantbrain.com/hc/en-us/sections/22566081839895-Operators
+    source: brain_zendesk
+    login_required: false
+    content_expectation: "BRAIN platform operator docs and community Q&A"
+    cleaning_rules: [nav, script, footer, ".sidebar"]
+    trigger_threshold: 10
+    dataset_tag: shared
+    max_per_run: 5
+
+  arxiv_quant:
+    type: html
+    url_template: https://arxiv.org/list/q-fin.PM/recent
+    source: arxiv
+    login_required: false
+    content_expectation: "Recent quantitative finance portfolio management papers"
+    cleaning_rules: [nav, script, footer, ".search-bar"]
+    trigger_threshold: 5
+    dataset_tag: shared
+    max_per_run: 10
+
+  wq_zendesk_operators:
+    type: html
+    url_template: https://worldquant.zendesk.com/hc/en-us/categories/22566081839895
+    source: brain_zendesk
+    login_required: false
+    content_expectation: "WorldQuant BRAIN operator reference and FAQ articles"
+    cleaning_rules: [nav, script, footer, ".article-sidebar"]
+    trigger_threshold: 8
+    dataset_tag: shared
+    max_per_run: 20

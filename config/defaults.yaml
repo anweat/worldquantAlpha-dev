@@ -1,0 +1,69 @@
+# config/defaults.yaml — Centralized default values for agents, payloads, and workspaces.
+#
+# Used by AgentBase._safe_handle() to fill missing payload fields in lenient mode.
+# Pattern: defaults.get("agent_defaults.alpha_gen.n_per_request", 4)
+
+# ---------------------------------------------------------------------------
+# Per-agent operational defaults
+# ---------------------------------------------------------------------------
+agent_defaults:
+  alpha_gen:
+    n_per_request: 4
+    timeout_secs: 600
+    max_retries: 1
+    modes: [explore, specialize, review_failure, track_news]
+  doc_summarizer:
+    batch_threshold: 5
+    timeout_secs: 600
+    max_retries: 1
+  failure_analyzer:
+    timeout_secs: 600
+    max_retries: 1
+  sim_executor:
+    timeout_secs: 1200
+    max_retries: 0
+  submitter:
+    timeout_secs: 300
+    max_retries: 0
+  portfolio_analyzer:
+    timeout_secs: 600
+    max_retries: 1
+  crawler:
+    timeout_secs: 1800
+    max_retries: 1
+
+# ---------------------------------------------------------------------------
+# Per-topic payload field defaults (applied when field absent in lenient mode)
+# ---------------------------------------------------------------------------
+payload_defaults:
+  GENERATE_REQUESTED:
+    n: 4
+    mode: explore
+    direction_hint: null
+    source: watchdog
+  ALPHA_DRAFTED:
+    rationale: ""
+    settings_overrides: {}
+  IS_RESULT:
+    passed: false
+  DOC_FETCHED:
+    summarize: true
+  CRAWL_REQUESTED:
+    force: false
+    goal: ""
+    summarize: true
+
+# ---------------------------------------------------------------------------
+# Workspace defaults (used when workspace_rules not declared by agent)
+# ---------------------------------------------------------------------------
+workspace_defaults:
+  reads: []
+  writes: []
+  memory_files: []
+
+# ---------------------------------------------------------------------------
+# Pool / direction defaults
+# ---------------------------------------------------------------------------
+pool_defaults:
+  unknown_direction_id: "unknown|other|MARKET|0"
+  min_alphas_before_specialize: 10

@@ -1,0 +1,26 @@
+rate_limits:
+  # Phase 2 T2 real-run budget — adjust back after.
+  daily_cap_total: 80
+  daily_cap_per_agent:
+    alpha_gen: 30          # generation is the workhorse for T2
+    failure_analyzer: 10
+    doc_summarizer: 12
+    portfolio_analyzer: 4
+    crawler_intent: 6
+  per_round_cap_per_agent:
+    alpha_gen: 4           # allow 4 gen calls per round (one per dimension batch)
+    failure_analyzer: 2
+    doc_summarizer: 3
+batching:
+  default_batch_size: 1    # default: no batching — single rich call per request
+  default_flush_secs: 5
+adapters:
+  copilot:
+    binary: copilot
+    timeout_secs: 120
+  openai:
+    base_url_env: OPENAI_BASE_URL
+    key_env: OPENAI_API_KEY
+  glm:
+    base_url_env: WQBUS_GLM_BASE
+    key_env: WQBUS_GLM_API_KEY

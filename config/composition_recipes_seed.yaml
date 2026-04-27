@@ -1,0 +1,97 @@
+# config/composition_recipes_seed.yaml
+# Seed recipes loaded at startup by recipes.ensure_seeds().
+# origin: builtin — never disabled by automation.
+#
+# pattern_regex: Python regex matching the alpha expression.
+#   Use raw strings: backslashes need doubling in YAML.
+#   Named groups (e.g. (?P<X>...)) can capture field slots.
+# theme_tags: comma-separated theme names (from docs/themes whitelist).
+# field_slots: list of slot placeholder names used in the regex.
+
+- recipe_id: ts_delta_short
+  semantic_name: "短期动量 (ts_delta 1-5d)"
+  pattern_regex: "\\brank\\s*\\(\\s*ts_delta\\s*\\("
+  field_slots: ["<X>", "<lookback>"]
+  theme_tags: "momentum.short"
+  example_expressions: ["rank(ts_delta(close, 3))", "rank(ts_delta(returns, 5))"]
+  origin: builtin
+  notes: "Short-term momentum via ts_delta rank"
+
+- recipe_id: ts_delta_medium
+  semantic_name: "中期动量 (ts_delta 5-20d)"
+  pattern_regex: "\\brank\\s*\\(\\s*ts_delta\\s*\\([^,]+,\\s*(1[0-9]|20)\\s*\\)"
+  field_slots: ["<X>", "<lookback>"]
+  theme_tags: "momentum.medium"
+  example_expressions: ["rank(ts_delta(close, 10))", "rank(ts_delta(vwap, 15))"]
+  origin: builtin
+
+- recipe_id: vol_ret_corr_60d
+  semantic_name: "60日量收相关"
+  pattern_regex: "\\bts_corr\\s*\\([^,]*vol[^,]*,[^,]*ret[^,]*,\\s*60\\s*\\)"
+  field_slots: ["<VOL>", "<RET>"]
+  theme_tags: "sentiment.liquidity,reversal"
+  example_expressions: ["rank(ts_corr(volume, returns, 60))"]
+  origin: builtin
+
+- recipe_id: ts_corr_any
+  semantic_name: "时序相关 (ts_corr 通用)"
+  pattern_regex: "\\bts_corr\\s*\\("
+  field_slots: ["<X>", "<Y>", "<lookback>"]
+  theme_tags: "technical.range"
+  example_expressions: ["rank(ts_corr(close, volume, 20))"]
+  origin: builtin
+
+- recipe_id: fund_ratio_rank
+  semantic_name: "基本面比率截面排名"
+  pattern_regex: "\\brank\\s*\\(\\s*(liabilities|assets|equity|debt|revenue|sales|cash|income|profit|earnings|goodwill|intangibles|receivables|inventory)"
+  field_slots: ["<FUND_A>", "<FUND_B>"]
+  theme_tags: "factor.value"
+  example_expressions: [
+    "rank(liabilities/assets)",
+    "rank(operating_income/assets)",
+    "rank(cash/(assets+1))"
+  ]
+  origin: builtin
+
+- recipe_id: group_rank_fundamental
+  semantic_name: "行业内基本面排名"
+  pattern_regex: "\\bgroup_rank\\s*\\([^,]+,\\s*(sector|industry|subindustry)\\s*\\)"
+  field_slots: ["<EXPR>", "<GROUPBY>"]
+  theme_tags: "factor.value,factor.quality"
+  example_expressions: [
+    "group_rank(liabilities/assets, sector)",
+    "group_rank(roe, industry)"
+  ]
+  origin: builtin
+
+- recipe_id: group_rank_ts
+  semantic_name: "行业内时序指标排名"
+  pattern_regex: "\\bgroup_rank\\s*\\(\\s*ts_(delta|corr|mean|std_dev)"
+  field_slots: ["<TS_EXPR>", "<GROUPBY>"]
+  theme_tags: "momentum.short,technical.range"
+  example_expressions: ["group_rank(ts_delta(close, 5), sector)"]
+  origin: builtin
+
+- recipe_id: reversal_short
+  semantic_name: "短期反转"
+  pattern_regex: "\\brank\\s*\\(\\s*-\\s*ts_delta|\\brank\\s*\\(\\s*ts_delta.*\\*\\s*-1"
+  field_slots: ["<X>"]
+  theme_tags: "reversal.short"
+  example_expressions: ["rank(-ts_delta(close, 5))", "rank(ts_delta(returns, 3) * -1)"]
+  origin: builtin
+
+- recipe_id: ts_zscore
+  semantic_name: "Z-score 标准化时序"
+  pattern_regex: "\\bts_zscore\\s*\\("
+  field_slots: ["<X>", "<lookback>"]
+  theme_tags: "technical.breakout"
+  example_expressions: ["rank(ts_zscore(close, 20))"]
+  origin: builtin
+
+- recipe_id: fundamental_ratio_div
+  semantic_name: "基本面比值 (A/B 形式)"
+  pattern_regex: "\\brank\\s*\\(\\s*(liabilities|assets|equity|debt|revenue|sales|cash|income|earnings)\\s*/\\s*(assets|equity|revenue|sales|liabilities)"
+  field_slots: ["<A>", "<B>"]
+  theme_tags: "factor.value"
+  example_expressions: ["rank(liabilities/assets)", "rank(cash/assets)"]
+  origin: builtin
