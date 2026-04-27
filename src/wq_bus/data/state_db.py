@@ -53,6 +53,12 @@ def enqueue_submission(
     note: str = "",
     trace_id: str | None = None,
 ) -> None:
+    """Enqueue an alpha for submission.
+
+    Uses ON CONFLICT … DO UPDATE so re-enqueuing an existing item
+    preserves ``retry_count`` (previously INSERT OR REPLACE reset it,
+    making the dead-letter escalation logic unreliable).
+    """
     tag = require_tag()
     if trace_id is None:
         from wq_bus.utils.tag_context import get_trace_id
@@ -60,10 +66,19 @@ def enqueue_submission(
     now = time.time()
     with open_state() as conn:
         conn.execute(
-            """INSERT OR REPLACE INTO submission_queue
+            """INSERT INTO submission_queue
                (alpha_id, dataset_tag, status, priority, is_metrics, sc_value,
                 enqueued_at, updated_at, note, trace_id)
-               VALUES (?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?)""",
+               VALUES (?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?)
+               ON CONFLICT(alpha_id, dataset_tag) DO UPDATE SET
+                 status='pending',
+                 priority=excluded.priority,
+                 is_metrics=COALESCE(excluded.is_metrics, submission_queue.is_metrics),
+                 sc_value=COALESCE(excluded.sc_value, submission_queue.sc_value),
+                 updated_at=excluded.updated_at,
+                 note=excluded.note,
+                 trace_id=COALESCE(excluded.trace_id, submission_queue.trace_id)
+               """,
             (alpha_id, tag, priority,
              json.dumps(is_metrics) if is_metrics else None,
              sc_value, now, now, note, trace_id),
@@ -127,6 +142,80 @@ def queue_size(status: str = "pending") -> int:
         return int(row["n"])
 
 
+def count_submitted_today() -> int:
+    """How many alphas have status='submitted' with updated_at in the last 24h.
+
+    Used by the submitter to enforce ``daily_max`` from submission.yaml across
+    process restarts (the in-memory n_submitted counter resets per flush).
+    """
+    tag = require_tag()
+    cutoff = time.time() - 86400
+    with open_state() as conn:
+        row = conn.execute(
+            """SELECT COUNT(*) AS n FROM submission_queue
+               WHERE dataset_tag=? AND status='submitted' AND updated_at >= ?""",
+            (tag, cutoff),
+        ).fetchone()
+        return int(row["n"])
+
+
+def claim_queue_item(alpha_id: str, *, from_status: tuple[str, ...] = ("pending", "retry_pending")) -> bool:
+    """Atomically transition ``alpha_id`` to status='submitting' iff its current
+    status is one of ``from_status``. Returns True if this caller wins the race.
+
+    Prevents two concurrent flushes from double-submitting the same alpha.
+    """
+    tag = require_tag()
+    placeholders = ",".join("?" for _ in from_status)
+    with open_state() as conn:
+        cur = conn.execute(
+            f"""UPDATE submission_queue
+                SET status='submitting', updated_at=?
+                WHERE alpha_id=? AND dataset_tag=? AND status IN ({placeholders})""",
+            (time.time(), alpha_id, tag, *from_status),
+        )
+        return cur.rowcount > 0
+
+
+def requeue_alpha(alpha_id: str, *, reset_retry: bool = False, note: str = "manual requeue") -> bool:
+    """Move an alpha (typically from 'dead_letter' / 'failed') back to 'pending'.
+
+    Returns True if a row was updated. When ``reset_retry`` is True the
+    retry_count is also reset to 0 (use sparingly — defeats dead-letter).
+    """
+    tag = require_tag()
+    with open_state() as conn:
+        if reset_retry:
+            cur = conn.execute(
+                """UPDATE submission_queue
+                   SET status='pending', updated_at=?, note=?, retry_count=0,
+                       last_error=NULL
+                   WHERE alpha_id=? AND dataset_tag=?""",
+                (time.time(), note, alpha_id, tag),
+            )
+        else:
+            cur = conn.execute(
+                """UPDATE submission_queue
+                   SET status='pending', updated_at=?, note=?
+                   WHERE alpha_id=? AND dataset_tag=?""",
+                (time.time(), note, alpha_id, tag),
+            )
+        return cur.rowcount > 0
+
+
+def list_queue_by_status(status: str) -> list[dict]:
+    """List all queue items in a given status (for CLI / admin use)."""
+    tag = require_tag()
+    with open_state() as conn:
+        rows = conn.execute(
+            """SELECT * FROM submission_queue
+               WHERE dataset_tag=? AND status=?
+               ORDER BY updated_at DESC""",
+            (tag, status),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
 # ---------- ai_calls ----------
 
 def record_ai_call(
@@ -171,14 +260,22 @@ def record_ai_call(
         return cur.lastrowid
 
 
-def count_ai_calls_today(*, agent_type: str | None = None) -> int:
-    """Count AI calls in the last 24h. Used by RateLimiter for daily cap."""
+def count_ai_calls_today(*, agent_type: str | None = None,
+                         source: str | None = None) -> int:
+    """Count AI calls in the last 24h. Used by RateLimiter for daily cap.
+
+    Pass ``source='auto'`` to exclude manual calls from the count (so manual
+    invocations don't eat the daily auto budget).
+    """
     cutoff = time.time() - 86400
     sql = "SELECT COUNT(*) AS n FROM ai_calls WHERE ts >= ?"
     params: list = [cutoff]
     if agent_type:
         sql += " AND agent_type=?"
         params.append(agent_type)
+    if source:
+        sql += " AND source=?"
+        params.append(source)
     with open_state() as conn:
         return int(conn.execute(sql, params).fetchone()["n"])
 

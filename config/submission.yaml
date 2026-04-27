@@ -1,0 +1,10 @@
+# Submission thresholds + per-day cap.
+thresholds:
+  sharpe_min: 1.25
+  fitness_min: 1.0
+  turnover_min: 0.01
+  turnover_max: 0.70
+daily_max: 6
+max_per_flush: 4
+# Dead-letter after this many transient failures (Submitter.max_retries).
+max_retries: 3

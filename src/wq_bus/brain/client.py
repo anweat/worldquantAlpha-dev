@@ -293,9 +293,23 @@ class BrainClient:
         return self._get(f"/alphas/{alpha_id}")
 
     def submit_alpha(self, alpha_id: str) -> dict:
-        """POST /alphas/{id}/submit — submit an alpha for review."""
+        """POST /alphas/{id}/submit — submit an alpha for review.
+
+        Raises ``RuntimeError`` on non-2xx responses so callers don't
+        accidentally treat 4xx/5xx as success and mark the queue item
+        ``submitted`` (which would permanently lose the alpha).
+        """
         resp = self._post(f"/alphas/{alpha_id}/submit")
-        return {"status": resp.status_code, "body": resp.json() if resp.content else {}}
+        body: dict = {}
+        try:
+            body = resp.json() if resp.content else {}
+        except Exception:
+            body = {"_raw": (resp.text or "")[:500]}
+        if not (200 <= resp.status_code < 300):
+            raise RuntimeError(
+                f"submit_alpha {alpha_id} HTTP {resp.status_code}: {str(body)[:300]}"
+            )
+        return {"status": resp.status_code, "body": body, **(body if isinstance(body, dict) else {})}
 
     def get_pnl(self, alpha_id: str) -> list[tuple[str, float]]:
         """GET /alphas/{id}/recordsets/pnl — returns [(date, pnl), ...].

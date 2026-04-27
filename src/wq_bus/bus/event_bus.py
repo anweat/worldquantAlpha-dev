@@ -82,9 +82,17 @@ class EventBus:
 
     async def drain(self, timeout: Optional[float] = None) -> None:
         """Wait for all in-flight background tasks to finish, including
-        downstream tasks emitted by handlers themselves."""
+        downstream tasks emitted by handlers themselves.
+
+        Uses a small grace yield so handlers that haven't yet been registered
+        as asyncio Tasks (e.g. emitted on the same tick as drain entry) get a
+        chance to populate self._tasks before we early-return.
+        """
         import time as _t
         deadline = (_t.monotonic() + timeout) if timeout else None
+        # Grace yield: let the loop tick once so any just-emitted tasks
+        # register themselves in self._tasks before we observe emptiness.
+        await asyncio.sleep(0)
         # Loop until no new tasks appear
         while self._tasks:
             pending = list(self._tasks)

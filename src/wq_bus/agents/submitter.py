@@ -28,6 +28,18 @@ class Submitter(AgentBase):
 
     async def on_queue_flush_requested(self, event: Event) -> None:
         tag = event.dataset_tag
+        # Enforce daily_max BEFORE picking items so we don't even try when
+        # the day's budget is exhausted (was loaded from yaml but never
+        # checked previously — see submission.yaml: daily_max).
+        try:
+            already_today = state_db.count_submitted_today()
+        except Exception:
+            already_today = 0
+        remaining_today = max(0, self.daily_max - already_today)
+        if remaining_today <= 0:
+            self.log.info("submitter: daily_max=%d reached (today=%d), skip flush for %s",
+                          self.daily_max, already_today, tag)
+            return
         # Pick up both fresh and retry-eligible items.
         queue = state_db.list_queue(status="pending")
         queue += state_db.list_queue(status="retry_pending")
@@ -37,9 +49,16 @@ class Submitter(AgentBase):
 
         loop = asyncio.get_running_loop()
         n_submitted = 0
-        for item in queue[: self.max_per_flush]:
+        budget = min(self.max_per_flush, remaining_today)
+        for item in queue:
+            if n_submitted >= budget:
+                break
             alpha_id = item["alpha_id"]
-            state_db.update_queue_status(alpha_id, "submitting")
+            # Atomic claim — if we lose the race (another flush already took
+            # this item), skip and keep going.
+            if not state_db.claim_queue_item(alpha_id):
+                self.log.debug("submitter: lost claim race for %s, skipping", alpha_id)
+                continue
             try:
                 if alpha_id.startswith("DRY"):
                     # Synthetic dry-run alpha — skip the real API call.

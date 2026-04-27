@@ -248,7 +248,10 @@ class Dispatcher:
             cap = _load_daily_cap()
             today_count = 0
             try:
-                today_count = count_ai_calls_today()
+                # Filter by source='auto' so manual calls don't burn the
+                # auto budget (the cap only blocks auto, but the count
+                # must match the cap's denominator — see is_capped()).
+                today_count = count_ai_calls_today(source="auto")
             except Exception:
                 pass
             if today_count >= cap:

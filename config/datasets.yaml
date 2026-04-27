@@ -1,0 +1,189 @@
+# datasets.yaml — 数据集标签目录
+#
+# 每个数据集定义：region/universe 组合的模拟设置、字段可用性、实战经验注记
+# 新增数据集时，在 datasets 列表中追加一项即可；所有模块通过 dataset_tag 引用
+#
+# 字段说明：
+#   tag          : 唯一标识符，用于标签体系中的 dataset_tag
+#   label        : 人类可读名称
+#   region       : API region 参数
+#   universe     : API universe 参数
+#   delay        : 默认 delay
+#   active       : 是否当前使用
+#   pass_rate_14d: 过去 14 天实测通过率（由 alpha_analyst.py 更新）
+#   notes        : 实战经验摘要
+#   recommended_settings : 推荐的 settings 覆盖项
+#   field_availability   : 该宇宙可用的数据类型标签列表
+#   saturation_risk      : 哪些数据源已过度使用（self_corr FAIL 风险）
+
+datasets:
+  - tag: usa_top3000
+    label: "USA TOP3000"
+    region: USA
+    universe: TOP3000
+    delay: 1
+    active: true
+    pass_rate_14d: 0.142        # 从 KB 实测：810 simulated, 115 passed
+    notes: |
+      主力宇宙。基本面因子（fundamental/valuation_ev/analyst_estimates）天然低换手（1-5%），
+      Fitness 公式中 max(TO, 0.125)=0.125，使得 Fitness ≈ Sharpe × √(Returns/0.125)，
+      Returns 需 > 8% 才能达到 Fitness ≥ 1.0。
+      技术因子（ts_corr/ts_std_dev）换手 20-90%，HIGH_TURNOVER 是最大失败原因。
+      情绪因子（snt1_/scl12_buzz/rp_css）在 TOP3000 饱和度较高，需切换 TOP1000 宇宙。
+      行业内中性化（SUBINDUSTRY）比 MARKET 通过率高约 15-20%。
+    recommended_settings:
+      fundamental:
+        decay: 0
+        neutralization: SUBINDUSTRY
+        truncation: 0.08
+        nanHandling: "ON"
+      technical:
+        decay: 4
+        neutralization: INDUSTRY
+        truncation: 0.05
+        nanHandling: "OFF"
+      sentiment:
+        decay: 4
+        neutralization: SUBINDUSTRY
+        truncation: 0.05
+        nanHandling: "ON"
+        universe: TOP1000   # 情绪信号在 TOP1000 更有效
+      options:
+        decay: 2
+        neutralization: INDUSTRY
+        truncation: 0.05
+        nanHandling: "OFF"
+    field_availability:
+      - fundamentals         # assets, liabilities, equity, sales, operating_income
+      - analyst_estimates    # est_eps, est_fcf, est_revenue, est_ebitda
+      - valuation_ev         # enterprise_value, ebit, ebitda, net_debt
+      - news_sentiment       # snt1_*, scl12_buzz, rp_css, nws12_*
+      - options              # implied_volatility, pcr_*, parkinson
+      - cashflow             # free_cash_flow, cash_and_equiv
+      - short_interest       # short_interest
+      - volume               # adv20, adv5, volume
+      - price_technical      # close, returns, ts_corr, ts_std_dev
+    saturation_risk:
+      - leverage             # ≥3 qualified submitted
+      - profitability        # ≥3 qualified submitted
+      - sales_income         # ≥3 qualified submitted
+      - news_sentiment       # ≥3 qualified submitted
+
+  # ── 预留扩展槽 ────────────────────────────────────────────────────────────
+  - tag: usa_top1000
+    label: "USA TOP1000"
+    region: USA
+    universe: TOP1000
+    delay: 1
+    active: false              # 按需启用（情绪/选项信号专用）
+    pass_rate_14d: null
+    notes: |
+      适合情绪信号和选项信号。股票池更小（流动性更高），情绪信号信噪比更好。
+      基本面因子在此宇宙覆盖度下降，不推荐。
+    recommended_settings:
+      sentiment:
+        decay: 4
+        neutralization: SUBINDUSTRY
+        truncation: 0.05
+        nanHandling: "ON"
+    field_availability:
+      - news_sentiment
+      - options
+      - analyst_estimates
+    saturation_risk: []
+
+  - tag: europe_top1200
+    label: "Europe TOP1200"
+    region: EUROPE
+    universe: TOP1200
+    delay: 1
+    active: false
+    pass_rate_14d: null
+    notes: "尚未探索。欧洲市场基本面数据质量略低于美国，季报频率不同（部分半年报）。"
+    recommended_settings: {}
+    field_availability:
+      - fundamentals
+      - price_technical
+      - volume
+    saturation_risk: []
+
+  - tag: china_a500
+    label: "China A500"
+    region: CHN
+    universe: TOP500
+    delay: 1
+    active: false
+    pass_rate_14d: null
+    notes: "尚未探索。A股市场与美股因子逻辑差异较大，散户比例高，动量因子可能更有效。"
+    recommended_settings: {}
+    field_availability:
+      - fundamentals
+      - price_technical
+      - volume
+    saturation_risk: []
+
+default_tag: usa_top3000
+
+# ─── field_class_map ────────────────────────────────────────────────────────
+# Optional explicit field-name → DATA_FIELD_CLASS overrides used by
+# wq_bus/domain/dimensions.py._classify_fields_in_expr() and by
+# recipes._resolve_slots() when filtering candidate fields by dataset.
+# Falls back to heuristics in dimensions.py when a field is absent here.
+field_class_map:
+  # fundamentals (absolute)
+  assets:                fundamental.absolute
+  liabilities:           fundamental.absolute
+  equity:                fundamental.absolute
+  sales:                 fundamental.absolute
+  revenue:               fundamental.absolute
+  operating_income:      fundamental.absolute
+  net_income:            fundamental.absolute
+  ebit:                  fundamental.absolute
+  ebitda:                fundamental.absolute
+  cash_and_equiv:        fundamental.absolute
+  free_cash_flow:        fundamental.absolute
+  net_debt:              fundamental.absolute
+  enterprise_value:      fundamental.absolute
+  # fundamentals (ratio)
+  pe:                    fundamental.ratio
+  pb:                    fundamental.ratio
+  ps:                    fundamental.ratio
+  ev_ebitda:             fundamental.ratio
+  roe:                   fundamental.ratio
+  roa:                   fundamental.ratio
+  gross_margin:          fundamental.ratio
+  operating_margin:      fundamental.ratio
+  net_margin:            fundamental.ratio
+  debt_to_equity:        fundamental.ratio
+  liabilities_to_assets: fundamental.ratio
+  ni:                    fundamental.ratio          # net income margin alias
+  # price
+  open:                  price
+  high:                  price
+  low:                   price
+  close:                 price
+  vwap:                  price
+  returns:               price
+  adj_close:             price
+  # volume
+  volume:                volume
+  adv5:                  volume
+  adv20:                 volume
+  adv60:                 volume
+  adv120:                volume
+  turnover:              volume
+  # technical
+  rsi:                   technical
+  macd:                  technical
+  atr:                   technical
+  beta:                  technical
+  momentum:              technical
+  volatility:            technical
+  # macro
+  gdp:                   macro
+  cpi:                   macro
+  inflation:             macro
+  interest_rate:         macro
+  fx_rate:               macro
+  vix:                   macro
+

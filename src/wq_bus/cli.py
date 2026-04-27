@@ -1693,5 +1693,67 @@ def recipe_extract_cmd(ctx, dataset_tag, min_support, statuses, out_path, no_emi
     click.echo(f"Extracted {len(result)} candidate groups (min_support={min_support}, tag={tag})")
 
 
+# ---------------------------------------------------------------------------
+# `wqbus queue` — submission queue admin (requeue, list, peek dead-letter)
+# ---------------------------------------------------------------------------
+@cli.group("queue")
+def queue_grp():
+    """Submission queue admin commands."""
+
+
+@queue_grp.command("list")
+@click.option("--status", default="dead_letter",
+              help="Status to list (pending|retry_pending|dead_letter|submitted|failed).")
+@click.option("--dataset", "dataset_tag", default=None, help="Override dataset tag.")
+def queue_list(status: str, dataset_tag: str | None):
+    """List queue items in a given status (default: dead_letter)."""
+    from wq_bus.utils.tag_context import with_tag
+    from wq_bus.utils.yaml_loader import load_yaml
+    from wq_bus.data import state_db
+    tag = dataset_tag or (load_yaml("datasets") or {}).get("default_tag", "_global")
+    with with_tag(tag):
+        rows = state_db.list_queue_by_status(status)
+    click.echo(f"=== submission_queue (tag={tag}, status={status}, n={len(rows)}) ===")
+    for r in rows:
+        click.echo(f"  {r['alpha_id']:<14} retry={r.get('retry_count', 0)} "
+                   f"updated={r.get('updated_at', 0):.0f} note={(r.get('note') or '')[:40]} "
+                   f"err={(r.get('last_error') or '')[:60]}")
+
+
+@queue_grp.command("requeue")
+@click.argument("alpha_id", required=False)
+@click.option("--all-deadletter", is_flag=True,
+              help="Requeue every dead_letter item for the dataset.")
+@click.option("--reset-retry", is_flag=True,
+              help="Also reset retry_count to 0 (defeats dead-letter — use sparingly).")
+@click.option("--dataset", "dataset_tag", default=None, help="Override dataset tag.")
+def queue_requeue(alpha_id: str | None, all_deadletter: bool,
+                  reset_retry: bool, dataset_tag: str | None):
+    """Move alpha(s) from dead_letter / failed back to pending.
+
+    Examples:
+        wqbus queue requeue ALPHA123
+        wqbus queue requeue --all-deadletter --reset-retry
+    """
+    from wq_bus.utils.tag_context import with_tag
+    from wq_bus.utils.yaml_loader import load_yaml
+    from wq_bus.data import state_db
+    tag = dataset_tag or (load_yaml("datasets") or {}).get("default_tag", "_global")
+    if not alpha_id and not all_deadletter:
+        click.echo("error: provide ALPHA_ID or --all-deadletter", err=True)
+        raise click.Abort()
+    with with_tag(tag):
+        if all_deadletter:
+            items = state_db.list_queue_by_status("dead_letter")
+            n = 0
+            for it in items:
+                if state_db.requeue_alpha(it["alpha_id"], reset_retry=reset_retry):
+                    n += 1
+            click.echo(f"requeued {n}/{len(items)} dead-letter items (reset_retry={reset_retry})")
+        else:
+            ok = state_db.requeue_alpha(alpha_id, reset_retry=reset_retry)  # type: ignore[arg-type]
+            click.echo(f"{'requeued' if ok else 'NOT FOUND'}: {alpha_id} (reset_retry={reset_retry})")
+
+
 if __name__ == "__main__":
     main()
