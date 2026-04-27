@@ -1,0 +1,7 @@
+# DEPRECATED — this file has no consumers in the wq_bus codebase as of 2026-04-27.
+# Kept for reference; safe to delete after one release cycle.
+# See archive/2026-04-25_old_scripts/ for the legacy daily_workflow code that read it.
+
+# Bus core configuration.
+critical_event_persistence: true
+default_handler_timeout_secs: 120

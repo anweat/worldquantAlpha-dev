@@ -1,0 +1,117 @@
+# DEPRECATED — this file has no consumers in the wq_bus codebase as of 2026-04-27.
+# Kept for reference; safe to delete after one release cycle.
+# See archive/2026-04-25_old_scripts/ for the legacy daily_workflow code that read it.
+
+# memory.yaml - 记忆管理系统配置
+#
+# 统一管理短期记忆、长期记忆、语义记忆
+# 支持归档策略和保留策略
+
+storage:
+  backend: sqlite                      # 可选: sqlite, postgres, chroma
+  sqlite:
+    path: "data/memory_kb.db"
+    journal_mode: WAL
+    cache_size: 10000
+
+  archive:
+    enabled: true
+    path: "memory/archive"
+    max_age_days: 90                   # 90天后自动归档
+    compression: gzip                   # gzip压缩归档文件
+    auto_archive: true
+
+semantic_search:
+  enabled: false                        # 当前禁用，可按需开启
+  vector_db: "chroma"
+  persist_path: "data/vector_db"
+  embedding_model: "text-embedding-3-small"
+  top_k: 5                              # 检索返回Top-K结果
+  similarity_threshold: 0.7
+
+memory_types:
+  short_term:
+    ttl_seconds: 86400                 # 24小时
+    auto_expire: true
+    description: "工作会话中的即时记忆"
+
+  medium_term:
+    ttl_days: 30
+    auto_expire: true
+    description: "跨日工作记忆，如失败模式、变异提示"
+
+  long_term:
+    ttl_days: 365
+    auto_expire: false
+    description: "永久知识，如最优Alpha、成功经验"
+
+retention_policies:
+  - category: "failure_patterns"
+    ttl_days: 30
+    archive_after_expire: true
+    priority: high
+
+  - category: "mutation_tasks"
+    ttl_days: 7
+    archive_after_expire: true
+    priority: high
+
+  - category: "submission_queue"
+    ttl_days: 90
+    archive_after_expire: false
+    priority: critical
+
+  - category: "portfolio_analysis"
+    ttl_days: 365
+    archive_after_expire: true
+    priority: medium
+
+  - category: "learnings"
+    ttl_days: 9999
+    archive_after_expire: false
+    priority: critical
+
+  - category: "crawl_index"
+    ttl_days: 9999
+    archive_after_expire: false
+    priority: medium
+
+  - category: "agent_sessions"
+    ttl_days: 90
+    archive_after_expire: true
+    priority: low
+
+memory_files:
+  # 内存中的JSON文件配置
+  context_files:
+    - path: "memory/ctx_alpha_gen.json"
+      max_versions: 5
+      auto_archive: true
+    - path: "memory/ctx_failure_analyzer.json"
+      max_versions: 5
+      auto_archive: true
+
+  analysis_files:
+    - path: "memory/failure_patterns.json"
+      max_versions: 10
+      auto_archive: true
+    - path: "memory/portfolio_analysis.json"
+      max_versions: 5
+      auto_archive: true
+
+  index_files:
+    - path: "memory/submission_queue.json"
+      max_versions: 0                   # 不保留历史
+    - path: "memory/expression_index.json"
+      max_versions: 3
+      auto_archive: true
+    - path: "memory/crawl_index.json"
+      max_versions: 5
+      auto_archive: true
+
+cleanup:
+  enabled: true
+  schedule: "daily"                     # daily, weekly, manual
+  run_time: "03:00"                     # 凌晨3点执行
+  remove_orphaned_files: true          # 清理孤儿文件
+  vacuum_db_on_cleanup: true           # 定期整理数据库

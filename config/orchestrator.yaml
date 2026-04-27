@@ -1,0 +1,92 @@
+# DEPRECATED — this file has no consumers in the wq_bus codebase as of 2026-04-27.
+# Kept for reference; safe to delete after one release cycle.
+# See archive/2026-04-25_old_scripts/ for the legacy daily_workflow code that read it.
+
+# orchestrator.yaml - 工作流编排配置
+#
+# 控制主Agent与子Agent的协调、迭代策略
+
+main_agent:
+  name: AlphaResearchCoordinator
+  role: Orchestrator
+  max_sub_agents: 4                    # 最多4个子Agent
+
+  sub_agents:
+    - name: alpha_generator
+      type: generate
+      max_calls_per_round: 3
+      min_batch_size: 10
+      max_batch_size: 50
+
+    - name: failure_analyzer
+      type: analyze
+      max_calls_per_round: 2
+      trigger_on_failures: 10          # 失败10个后触发
+
+    - name: portfolio_analyzer
+      type: analyze
+      max_calls_per_round: 1
+      frequency: daily
+
+    - name: crawler_knowledge
+      type: research
+      max_calls_per_round: 2
+      frequency: daily
+
+iteration:
+  enabled: true
+  max_rounds: 5                       # 最大迭代轮数
+  budget_per_round: 400               # 每轮预算
+
+  convergence:
+    target_submitted: 5                # 提交5个后停止
+    min_improvement: 0.05             # 最小改进阈值
+    plateau_detection: 3              # 连续3轮无改善则停止
+
+  mutation_strategy:
+    base_ratio: 0.20                   # 基础变异占比
+    guided_ratio: 0.30                 # 引导变异占比
+    diversity_ratio: 0.50             # 多样性生成占比
+
+    strategies:
+      - name: near_miss_mutation
+        trigger: sharpe >= 0.8
+        actions:
+          - change_neutralization
+          - adjust_decay
+          - extend_window
+      - name: cross_domain_mutation
+        trigger: single_category
+        actions:
+          - combine_with_other_domain
+      - name: parameter_sweep
+        trigger: baseline_performance
+        parameters:
+          - decay: [0, 2, 4, 6, 8]
+          - truncation: [0.05, 0.08, 0.10]
+          - neutralization: [MARKET, INDUSTRY, SUBINDUSTRY]
+
+coordination:
+  context_sharing: true               # 子Agent间共享上下文
+  result_aggregation: true            # 聚合子Agent结果
+  conflict_resolution: priority       # 冲突解决策略
+
+  communication:
+    sync_interval: 30                  # 同步间隔（秒）
+    timeout: 300                       # 子Agent超时
+
+feedback_loop:
+  enabled: true
+  collect_metrics: true
+  update_context: true
+
+  metrics_tracked:
+    - sharpe_improvement
+    - fitness_improvement
+    - pass_rate_change
+    - diversity_score
+
+  adaptation:
+    enabled: true
+    learning_rate: 0.1                # 学习率
+    memory_weight: 0.3                # 记忆权重

@@ -234,8 +234,18 @@ def record_ai_call(
     trace_id: str | None = None,
     prompt_text: str | None = None,
     response_text: str | None = None,
+    strength: str | None = None,
+    mode: str | None = None,
+    adapter: str | None = None,
+    package_id: str | None = None,
+    source: str = "auto",
 ) -> int:
-    """Record one AI call. Returns the inserted row id (used to link alphas back)."""
+    """Record one AI call. Returns the inserted row id (used to link alphas back).
+
+    Migration 005 added strength/mode/adapter/package_id/source columns —
+    callers should pass them so audit + count_ai_calls_today(source=...)
+    stay correct.
+    """
     tag = require_tag()
     if trace_id is None:
         from wq_bus.utils.tag_context import get_trace_id
@@ -251,11 +261,13 @@ def record_ai_call(
             """INSERT INTO ai_calls
                (ts, dataset_tag, agent_type, model, depth, provider, n_packed,
                 tokens_in, tokens_out, cost_usd, duration_ms, success, error,
-                trace_id, prompt_text, response_text)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                trace_id, prompt_text, response_text,
+                strength, mode, adapter, package_id, source)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (time.time(), tag, agent_type, model, depth, provider, n_packed,
              tokens_in, tokens_out, cost_usd, duration_ms, 1 if success else 0, error,
-             trace_id, prompt_text, response_text),
+             trace_id, prompt_text, response_text,
+             strength, mode, adapter, package_id, source),
         )
         return cur.lastrowid
 

@@ -1,0 +1,41 @@
+# DEPRECATED — this file has no consumers in the wq_bus codebase as of 2026-04-27.
+# Kept for reference; safe to delete after one release cycle.
+# See archive/2026-04-25_old_scripts/ for the legacy daily_workflow code that read it.
+
+# workflow.yaml — 流程参数配置
+#
+# 这里的参数控制 daily_workflow.py 的行为。修改此文件即可调整运行策略，无需改代码。
+
+simulation:
+  daily_budget: 2000            # 每日最大模拟次数
+  max_workers: 2                # 并发线程数（超过 3 可能触发 API 429）
+  batch_multiplier: 1.5         # 生成候选数 = budget × multiplier（预筛后取 budget 个）
+  retry_on_error: true          # 单个 alpha 失败时是否重试一次
+
+submission:
+  daily_target: 4               # 每会话提交目标数（达到后提前停止）
+  daily_max: 6                  # 全天所有会话的提交上限（不超过此数）
+  auto_submit: true             # 是否自动提交（设为 false 仅模拟不提交）
+  require_self_corr_pass: true  # 提交前必须 SELF_CORRELATION = PASS/PENDING
+
+submission_queue:
+  enabled: true                 # 是否启用跨日提交队列
+  max_size: 50                  # 队列最大容量
+  priority_by: fitness          # 队列排序字段（fitness / sharpe）
+  consume_queue_first: true     # 每日优先消费队列，再生成新 alpha
+
+iteration:
+  enabled: true                 # 是否启用失败→变异迭代循环
+  max_rounds: 3                 # 最大迭代轮数（每轮消耗 budget / max_rounds 个模拟）
+  failure_sample_size: 50       # 每轮分析最近 N 条失败记录
+  near_miss_threshold: 0.8      # sharpe ≥ 此值时视为"近失败"，优先变异
+
+reporting:
+  generate_daily_report: true   # 每日结束后生成日报
+  archive_reports: true         # 存档旧报告到 results/reports/archive/
+  portfolio_analysis_frequency: daily   # portfolio 分析频率：daily / weekly / manual
+  write_next_session_context: true      # 写 memory/next_session_context.md
+
+logging:
+  level: INFO                   # DEBUG / INFO / WARNING
+  save_logs: true               # 保存日志到 logs/

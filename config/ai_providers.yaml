@@ -1,0 +1,166 @@
+# DEPRECATED — this file has no consumers in the wq_bus codebase as of 2026-04-27.
+# Kept for reference; safe to delete after one release cycle.
+# See archive/2026-04-25_old_scripts/ for the legacy daily_workflow code that read it.
+
+# ai_providers.yaml - AI服务提供商配置
+#
+# 设计理念：单次调用 + 工具执行模式
+# - 主Agent一次调用可触发多个子任务（通过工具）
+# - 大幅减少AI调用次数，降低成本
+# - 迭代优化：生成 → 反馈 → 再生成
+
+providers:
+  copilot:
+    name: GitHub Copilot CLI
+    type: cli
+    mode: server                    # server模式：挂载在服务器的copilot daemon
+    endpoint: "http://localhost:8080"  # copilot server地址
+    command: "gh copilot"
+    timeout: 120
+    retry_on_failure: true
+    max_retries: 2
+    cost_model:
+      type: request_based
+      cost_per_call: 0
+      monthly_request_limit: 5000
+    capabilities:
+      supported_tasks:
+        - generate_alpha
+        - analyze_failure
+        - summarize_content
+        - extract_knowledge
+      max_tokens_per_response: 4000
+      context_window: 8000
+      support_tool_calls: true      # 是否支持工具调用
+
+  openai_proxy:
+    name: OpenAI Compatible Proxy
+    type: api
+    base_url: "http://localhost:8081/v1"  # OpenAI兼容端口
+    api_key: "${OPENAI_API_KEY}"
+    model: "gpt-4o-mini"
+    timeout: 180
+    retry_on_failure: true
+    max_retries: 3
+    cost_model:
+      type: token_based
+      input_cost_per_1k: 0.002
+      output_cost_per_1k: 0.008
+    capabilities:
+      support_tool_calls: true     # 支持Function Calling
+      max_tokens_per_response: 8000
+      context_window: 128000
+
+  openai_direct:
+    name: OpenAI Direct API
+    type: api
+    enabled: false
+    base_url: "https://api.openai.com/v1"
+    api_key: "${OPENAI_API_KEY_DIRECT}"
+    model: "gpt-4o"
+    timeout: 180
+    cost_model:
+      type: token_based
+      input_cost_per_1k: 0.015
+      output_cost_per_1k: 0.06
+
+# 工具调用模式配置
+tool_mode:
+  enabled: true
+  max_iterations_per_call: 5        # 单次AI调用最多迭代5次工具执行
+  iteration_timeout: 300            # 迭代总超时（秒）
+  
+  # 预注册工具
+  registered_tools:
+    - name: generate_alpha_batch
+      description: 生成一批Alpha候选表达式
+      auto_execute: true            # 自动执行，不需确认
+    
+    - name: mutate_alpha
+      description: 对现有Alpha进行变异生成变体
+      auto_execute: true
+    
+    - name: analyze_failures
+      description: 分析失败模式并生成变异提示
+      auto_execute: true
+    
+    - name: query_knowledge
+      description: 查询知识库中的历史经验
+      auto_execute: true
+    
+    - name: validate_expression
+      description: 验证Alpha表达式语法
+      auto_execute: true
+    
+    - name: save_learning
+      description: 保存学习到的经验
+      auto_execute: true
+    
+    - name: run_simulation
+      description: 在BRAIN平台运行模拟
+      auto_execute: true
+    
+    - name: check_submission
+      description: 检查Alpha提交状态
+      auto_execute: true
+
+# 路由规则
+routing_rules:
+  default_provider: copilot
+
+  rules:
+    - name: simple_generation
+      condition:
+        task_type: "generate_alpha"
+        complexity: "low"
+      provider: copilot
+      use_tools: true               # 启用工具调用
+      priority: 1
+
+    - name: generation_with_mutation
+      condition:
+        task_type: "generate_alpha"
+        has_feedback: true          # 有反馈时触发变异
+      provider: copilot
+      use_tools: true
+      max_iterations: 3
+      priority: 2
+
+    - name: complex_analysis
+      condition:
+        task_type: "analyze_failure"
+        sample_size: ">50"
+      provider: openai_proxy
+      priority: 1
+
+    - name: knowledge_extraction
+      condition:
+        task_type: "extract_knowledge"
+      provider: openai_proxy
+      priority: 1
+
+# 调用限制
+call_limits:
+  max_concurrent_calls: 2            # 最多2个并发调用
+  call_budget_per_round: 10         # 每轮最多10次AI调用
+  total_call_budget_per_day: 100   # 每日最多100次AI调用
+
+# 成本控制
+cost_control:
+  daily_budget_usd: 10.0
+  alert_threshold: 0.8
+  fallback_provider: copilot
+  
+  # 预算分配策略
+  budget_allocation:
+    generation: 0.4                 # 40%用于生成
+    analysis: 0.3                  # 30%用于分析
+    research: 0.3                  # 30%用于研究
+
+# 迭代策略
+iteration_strategy:
+  enabled: true
+  min_batch_size: 5                # 每次最少生成5个
+  max_batch_size: 30                # 每次最多生成30个
+  feedback_threshold: 3            # 失败3个后触发分析
+  improvement_threshold: 0.05      # 改进阈值

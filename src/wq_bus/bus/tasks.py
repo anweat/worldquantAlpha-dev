@@ -214,12 +214,17 @@ def _write_trace(
 ) -> None:
     """Persist trace row. Raises on DB failure — caller (start_task) MUST
     propagate so we don't return a TaskHandle backed by no DB row.
+
+    Uses plain INSERT (NOT ``INSERT OR IGNORE``): trace_id collisions are
+    astronomically unlikely (12 hex chars + UTC timestamp) and silently
+    dropping a duplicate would leave the in-memory _HANDLES map and DB out
+    of sync. UNIQUE constraint violation surfaces as IntegrityError.
     """
     import json
     from wq_bus.data._sqlite import open_state
     with open_state() as conn:
         conn.execute(
-            """INSERT OR IGNORE INTO trace
+            """INSERT INTO trace
                (trace_id, created_at, origin, parent_trace_id, task_kind,
                 task_payload_json, status, started_at)
                VALUES (?,?,?,?,?,?,?,?)""",

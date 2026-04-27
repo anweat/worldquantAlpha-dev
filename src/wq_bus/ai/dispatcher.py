@@ -719,11 +719,12 @@ class Dispatcher:
         return self._count_ai_calls_today(source=source) >= cap
 
     def _safe_record(self, **kwargs: Any) -> int | None:
-        """Call :func:`record_ai_call`; inject a fallback tag if none is active."""
-        # Drop non-standard kwargs that record_ai_call doesn't accept
-        kwargs.pop("strength", None)
-        kwargs.pop("source", None)
-        kwargs.pop("package_id", None)
+        """Call :func:`record_ai_call`; inject a fallback tag if none is active.
+
+        record_ai_call now accepts strength/mode/adapter/package_id/source
+        (migration 005 columns) — pass them through verbatim so the audit
+        trail is complete and ``count_ai_calls_today(source='auto')`` works.
+        """
         try:
             if get_tag() is None:
                 with with_tag("_global"):

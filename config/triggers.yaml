@@ -1,0 +1,90 @@
+# config/triggers.yaml — WatchdogPolicy and supervisor configuration.
+#
+# Base weights for mode selection, adaptive window, cooldowns, caps, timeouts.
+
+# ---------------------------------------------------------------------------
+# WatchdogPolicy base weights (explore:specialize:review_failure)
+# Used by DefaultStockpile weighted random pick.
+# ---------------------------------------------------------------------------
+base_weights:
+  explore: 4
+  specialize: 2
+  review_failure: 1
+  track_news: 1
+
+# Window of recent rounds to look at for adaptive weighting
+adapt_window: 10
+
+# Minimum minutes between two triggers of the same mode
+cooldown_min: 30
+
+# Hard floor: don't trigger if pending queue exceeds this
+queue_cap: 2000
+
+# Stockpile in-flight gating (per default_stockpile.py).
+# When True (default), watchdog skips triggering any new round while there
+# are simulations in flight — conservative throttle preserving SIMULATION_POOL.md §4.
+# Set to False + define in_flight_soft_cap to allow concurrent rounds.
+block_when_in_flight: true
+in_flight_soft_cap: 0    # ignored when block_when_in_flight=true; >0 caps concurrent rounds when false
+
+# Daily AI call cap (auto-triggered only; manual CLI exempt)
+daily_ai_cap: 80
+
+# Max tasks triggered per single watchdog round
+per_round_cap: 12
+
+# ---------------------------------------------------------------------------
+# Supervisor: trace timeout per task kind (seconds)
+# ---------------------------------------------------------------------------
+supervisor:
+  tick_secs: 15
+  default_timeout_secs: 900
+  task_timeout_secs: 900  # alias for default
+
+task_timeouts:
+  generate:  600
+  simulate:  1200
+  submit:    300
+  crawl:     1800
+  summarize: 600
+  analyze:   600
+
+# ---------------------------------------------------------------------------
+# batch_buffer tuning (used by dispatcher-v2)
+# ---------------------------------------------------------------------------
+batch_buffer:
+  max_secs: 10
+  max_tasks_per_bucket: 6
+  flush_on_chain: true
+
+# ---------------------------------------------------------------------------
+# Self-correlation / saturation bump thresholds
+# ---------------------------------------------------------------------------
+saturation:
+  high_self_corr_threshold: 0.6   # bump explore if avg_self_corr > this
+  high_pass_rate_threshold: 0.4   # bump specialize if is_pass_rate > this
+  low_pool_size_threshold: 50     # double explore weight if total alphas < this
+
+# ---------------------------------------------------------------------------
+# Phase 2 T1-G: Topic-based triggers with cooldowns
+# These are checked by watchdog_tick() in triggers.py / default_stockpile.py
+# ---------------------------------------------------------------------------
+triggers:
+  recipe_candidates_ready:
+    topic: RECIPE_CANDIDATES_READY
+    on_emit: doc_summarizer.recipe_synthesis
+    cooldown_secs: 600          # 10 min between synthesis runs
+
+  failure_batch_ready:
+    topic: FAILURE_BATCH_READY
+    on_emit: doc_summarizer.failure_synthesis
+    threshold: 10               # min pending (unanalyzed) failures to fire
+    cooldown_secs: 900          # 15 min
+
+  pool_stats_updated:
+    topic: POOL_STATS_UPDATED
+    on_emit: doc_summarizer.portfolio_review
+    cooldown_secs: 1800         # 30 min between portfolio reviews
+    min_new_directions: 20      # plan §T1-G: only fire when ≥N new directions since last fire
+
