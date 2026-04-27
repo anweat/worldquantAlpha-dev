@@ -329,15 +329,23 @@ def trace_prune_cmd(days, include_events, include_ai_calls, dry_run):
             if n > 10:
                 click.echo(f"  ... and {n - 10} more")
             return
-        # Real delete — chunk to avoid huge IN-clauses.
-        for i in range(0, n, 500):
-            chunk = trace_ids[i:i+500]
-            placeholders = ",".join(["?"] * len(chunk))
-            if include_events:
-                conn.execute(f"DELETE FROM events WHERE trace_id IN ({placeholders})", chunk)
-            if include_ai_calls:
-                conn.execute(f"DELETE FROM ai_calls WHERE trace_id IN ({placeholders})", chunk)
-            conn.execute(f"DELETE FROM trace WHERE trace_id IN ({placeholders})", chunk)
+        # Real delete — chunk to avoid huge IN-clauses; wrap in single
+        # transaction so a crash mid-loop doesn't leave orphan rows in
+        # events/ai_calls without their parent trace row.
+        conn.execute("BEGIN")
+        try:
+            for i in range(0, n, 500):
+                chunk = trace_ids[i:i+500]
+                placeholders = ",".join(["?"] * len(chunk))
+                if include_events:
+                    conn.execute(f"DELETE FROM events WHERE trace_id IN ({placeholders})", chunk)
+                if include_ai_calls:
+                    conn.execute(f"DELETE FROM ai_calls WHERE trace_id IN ({placeholders})", chunk)
+                conn.execute(f"DELETE FROM trace WHERE trace_id IN ({placeholders})", chunk)
+            conn.execute("COMMIT")
+        except Exception:
+            conn.execute("ROLLBACK")
+            raise
         click.echo(f"deleted {n} traces"
                    + (" + their events" if include_events else "")
                    + (" + their ai_calls" if include_ai_calls else ""))
@@ -570,7 +578,8 @@ async def _daemon_main(opts, idle_secs, auto_resume, auto_gen, auto_gen_n,
     from wq_bus.bus.event_bus import get_bus
     from wq_bus.bus.events import Topic, make_event
     from wq_bus.data import state_db
-    from wq_bus.data._sqlite import open_state, open_knowledge
+    from wq_bus.data._sqlite import open_state, open_knowledge, ensure_migrated
+    ensure_migrated()
     bus = get_bus()
     dispatcher = _build_dispatcher(opts["model"], opts["depth"], opts["dry_run"])
     brain = _build_brain_client()
@@ -1121,6 +1130,8 @@ def task_cmd(ctx, agent, mode, dataset_tag, url, goal, summarize, n, output_json
     """
     import asyncio
     import json as _json
+    from wq_bus.data._sqlite import ensure_migrated
+    ensure_migrated()
     tag = dataset_tag or ctx.obj.get("dataset")
     if not tag:
         try:

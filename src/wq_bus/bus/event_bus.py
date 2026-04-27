@@ -66,7 +66,14 @@ class EventBus:
                 return_exceptions=True,
             )
             self._maybe_close_trace_safe(event)
-        task = asyncio.create_task(_run_then_close())
+        try:
+            task = asyncio.create_task(_run_then_close())
+        except RuntimeError as exc:
+            # Event loop closed/closing — no point scheduling. Run terminal
+            # closure synchronously so the trace doesn't leak as 'running'.
+            log.warning("emit(%s): event loop unavailable (%s); skipping handlers", event.topic, exc)
+            self._maybe_close_trace_safe(event)
+            return
         self._tasks.add(task)
         task.add_done_callback(self._tasks.discard)
 

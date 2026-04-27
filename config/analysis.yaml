@@ -1,0 +1,12 @@
+self_correlation_threshold: 0.7
+pnl_correlation:
+  threshold: 0.7
+  min_overlap: 100
+overfit:
+  # Suggestion-trigger thresholds (consumed by analysis/overfitting_signals.py)
+  parameter_concentration_max: 0.5
+  field_overlap_max: 0.7
+  high_corr_pair_max: 3
+  # Overall heuristic-score bands
+  score_high: 0.6
+  score_low: 0.3

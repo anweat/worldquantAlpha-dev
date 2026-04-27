@@ -123,7 +123,14 @@ class TraceSupervisor:
 
     def start(self) -> "TraceSupervisor":
         """Schedule the supervisor coroutine as a background task."""
-        loop = asyncio.get_event_loop()
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            # No running loop (e.g. invoked from sync context) — fall back
+            # to the policy's loop. get_event_loop() is deprecated for the
+            # common case but still the documented escape hatch when there
+            # is no running loop and we don't want to create a new one.
+            loop = asyncio.get_event_loop_policy().get_event_loop()
         self._task = loop.create_task(self.run())
         return self
 

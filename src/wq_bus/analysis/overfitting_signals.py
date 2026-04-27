@@ -13,6 +13,29 @@ _TS_FUNC_RE = re.compile(r"\bts_\w+\s*\(")
 _TOP_N_FIELDS = 5
 
 
+def _load_thresholds() -> dict:
+    """Load overfit/pnl_correlation thresholds from config/analysis.yaml.
+
+    Falls back to historical hardcoded values when keys are absent so the
+    module never breaks if config is partial.
+    """
+    try:
+        from wq_bus.utils.yaml_loader import load_yaml
+        cfg = load_yaml("analysis") or {}
+    except Exception:
+        cfg = {}
+    overfit = cfg.get("overfit") or {}
+    pnl = cfg.get("pnl_correlation") or {}
+    return {
+        "param_conc_max":   float(overfit.get("parameter_concentration_max", 0.5)),
+        "field_overlap_max": float(overfit.get("field_overlap_max", 0.7)),
+        "high_corr_pair_max": int(overfit.get("high_corr_pair_max", 3)),
+        "pnl_corr_threshold": float(pnl.get("threshold", 0.7)),
+        "score_high":  float(overfit.get("score_high", 0.6)),
+        "score_low":   float(overfit.get("score_low", 0.3)),
+    }
+
+
 def _parse_ts_windows(expression: str) -> list[int]:
     """Extract ts_xxx window parameters, robust to nested function calls.
 
@@ -89,6 +112,7 @@ def analyze() -> dict:
     """
     alphas = knowledge_db.list_alphas(status="submitted", limit=500)
     expressions = [a["expression"] for a in alphas if a.get("expression")]
+    cfg = _load_thresholds()
 
     # 1. Parameter concentration — ts_xxx window histogram
     from collections import Counter
@@ -109,7 +133,7 @@ def analyze() -> dict:
     field_overlap_rate = safe_div(overlap_count, len(expressions))
 
     # 3. High PnL correlation pair count
-    high_corr_pairs = knowledge_db.list_pnl_corr(threshold=0.7)
+    high_corr_pairs = knowledge_db.list_pnl_corr(threshold=cfg["pnl_corr_threshold"])
     high_corr_pair_count = len(high_corr_pairs)
 
     # 4. Heuristic score (0–1)
@@ -127,28 +151,28 @@ def analyze() -> dict:
 
     # 5. Suggestions
     suggestions: list[str] = []
-    if top_window_frac > 0.5:
+    if top_window_frac > cfg["param_conc_max"]:
         top_window = window_counter.most_common(1)[0][0]
         suggestions.append(
             f"Over {top_window_frac:.0%} of submitted alphas use ts window={top_window}. "
             "Diversify lookback periods to reduce parameter overfit."
         )
-    if field_overlap_rate > 0.7:
+    if field_overlap_rate > cfg["field_overlap_max"]:
         suggestions.append(
             f"Field overlap rate is {field_overlap_rate:.0%} (>{_TOP_N_FIELDS} shared fields). "
             "Try different data fields to improve independence."
         )
-    if high_corr_pair_count > 3:
+    if high_corr_pair_count > cfg["high_corr_pair_max"]:
         suggestions.append(
-            f"{high_corr_pair_count} alpha pairs have PnL correlation ≥ 0.7. "
+            f"{high_corr_pair_count} alpha pairs have PnL correlation ≥ {cfg['pnl_corr_threshold']:.2f}. "
             "Submitted portfolio is highly correlated — consider diversifying strategies."
         )
-    if score > 0.6:
+    if score > cfg["score_high"]:
         suggestions.append(
-            f"Overall overfit score {score:.2f} > 0.6 — HIGH RISK. "
+            f"Overall overfit score {score:.2f} > {cfg['score_high']:.2f} — HIGH RISK. "
             "Review portfolio diversity before submitting more alphas."
         )
-    elif score < 0.3:
+    elif score < cfg["score_low"]:
         suggestions.append("Overfit score looks healthy. Portfolio appears well-diversified.")
 
     result = {

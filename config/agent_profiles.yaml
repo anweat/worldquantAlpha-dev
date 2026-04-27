@@ -1,0 +1,184 @@
+# agent_profiles.yaml — 子代理上下文规格 + 集中调度配置
+#
+# 自 plan v3 起：
+#   - 每个 agent 不再写自己的 provider/model/depth/batch_size/flush_secs
+#     （这些由 dispatcher 集中决定，见下方 adapters + strength_routing）
+#   - 本节保留：label / description / context_sources / output_files /
+#                key_prompt_params —— 仍被 ContextBuilder 消费
+#
+# 不变量（plan §3 原则 9）：agent 不输出 strength/model；dispatcher 集中调度。
+
+agents:
+
+  alpha_gen:
+    label: "Alpha 生成 Agent"
+    description: "生成新的 FE 表达式候选，融合失败变异提示和数据集经验"
+    # Dispatch: provider chooses adapter; model/depth come from strength_routing
+    provider: copilot
+    batch_size: 1           # single call returns N expressions; no buffering
+    flush_secs: 5
+    context_sources:
+      # KB 动态数据（context_builder 从 KB 查询后压缩注入）
+      - kb_fail_reasons_7d           # 最近 7 天失败原因统计（top 5）
+      - kb_category_pass_rates_14d   # 各类别通过率（top 5 + bottom 3）
+      - kb_saturated_sources         # 已饱和数据源列表（≥3 个提交 → self_corr 风险）
+      - kb_recent_learnings_7d       # 最近 7 天经验（最多 5 条，仅 insight 字段）
+      - kb_top_passing_alphas_10     # 最优 10 个 alpha（expr + is 指标）
+      # 静态知识文件（按需选取切片，不传全量）
+      - memory_failure_patterns      # failure_patterns.json（变异提示，最多 10 条）
+      - memory_dataset_insights      # dataset_insights.md（当前活跃数据集的段落）
+      - memory_expression_index_top20 # expression_index.json 中通过率最高的 20 个模板
+      # 配置文件
+      - config_datasets_active       # datasets.yaml 中 active=true 的数据集设置
+    output_files:
+      - results/                     # alpha 模拟结果保存到 results/
+    key_prompt_params:
+      - current_dataset_tag          # 当前目标数据集 tag
+      - daily_target_submissions     # 今日目标提交数
+      - avoid_categories             # 已饱和类别（不生成）
+      - mutation_hints               # 来自 failure_patterns 的具体变异建议
+
+  failure_analyzer:
+    label: "失败分析 Agent"
+    description: "分析近期失败 alpha，识别模式，生成变异提示供 alpha_gen 使用"
+    provider: copilot
+    batch_size: 1
+    flush_secs: 5
+    context_sources:
+      - kb_failed_alphas_recent_50   # 最近 50 条失败 alpha（expr + settings + fail_reasons + is_metrics）
+      - kb_near_miss_alphas_20       # sharpe ≥ 0.8 的近失败 alpha（最多 20 条）
+      - config_datasets_active       # 当前数据集设置（用于判断换手率阈值）
+    output_files:
+      - memory/<TAG>/failure_patterns.json  # 写入失败模式和变异提示（per-tag 隔离）
+    key_prompt_params:
+      - fail_reason_priority         # 本轮最常见失败原因
+      - near_miss_list               # 近失败 alpha 列表（用于生成变异）
+
+  crawler:
+    label: "爬虫 Agent"
+    description: "爬取 WorldQuant 文档/社区内容，清洗后写入 crawl_docs"
+    provider: copilot
+    batch_size: 3
+    flush_secs: 30
+    context_sources:
+      - kb_crawl_docs_index          # crawl_docs 表（已爬 url_hash 列表，避免重复）
+      - config_crawl_targets         # crawl_targets.yaml（目标域名 + 期望内容描述）
+    output_files:
+      - data/knowledge.db            # crawl_docs 表（统一入库，不再写散文件）
+    impl: src/wq_bus/crawler/crawler_agent.py
+    key_prompt_params:
+      - target_urls_today            # 今日待爬 URL 列表（来自 crawl_targets.yaml）
+      - already_crawled_urls         # 已爬 URL（来自 crawl_docs 表）
+      - cleaning_instructions        # 内容清洗规则（来自 crawl_targets.yaml）
+
+  portfolio_analyzer:
+    label: "Pool 组合分析 Agent（事件驱动）"
+    description: "对全量已测 alpha 做策略分析，识别空白区和最优参数"
+    provider: copilot
+    batch_size: 1
+    flush_secs: 5
+    context_sources:
+      - kb_all_passing_alphas        # 全部通过 IS 检查的 alpha（expr + 指标 + 类别）
+      - kb_category_pass_rates_all   # 所有类别通过率（无时间限制）
+      - kb_submitted_alphas          # 已提交 alpha 列表
+      - memory_portfolio_analysis    # 上一次分析结果（用于趋势比较）
+    output_files:
+      - memory/<TAG>/portfolio_analysis.json
+    key_prompt_params:
+      - analysis_scope               # 分析范围：all / recent_30d / by_category
+      - comparison_date              # 与哪日的分析做对比
+
+  daily_reporter:
+    label: "日报 Agent"
+    description: "生成每日 markdown 报告 + next_session_context.md"
+    provider: copilot
+    batch_size: 1
+    flush_secs: 5
+    context_sources:
+      - kb_today_stats
+      - kb_history_7d
+      - kb_recent_learnings_7d
+      - kb_fail_reasons_7d
+      - kb_top_passing_alphas_10
+      - memory_portfolio_analysis    # 引用最新组合分析摘要
+    output_files:
+      - results/reports/daily_{date}.md
+      - memory/next_session_context.md   # Copilot CLI 专用高密度上下文
+
+  doc_summarizer:
+    label: "文档总结 Agent"
+    description: "多模式：crawl_summary / recipe_synthesis / failure_synthesis / portfolio_review"
+    provider: copilot
+    batch_size: 5
+    flush_secs: 30
+
+  crawler_intent:
+    label: "爬虫意图识别 Agent"
+    provider: copilot
+    batch_size: 3
+    flush_secs: 30
+
+# Defaults consumed by ModelRouter when an agent omits a field
+defaults:
+  provider: copilot
+  batch_size: 1
+  flush_secs: 5
+
+# ---------------------------------------------------------------------------
+# Adapter billing mode + strength tiers (AI_DISPATCHER.md §2)
+# ---------------------------------------------------------------------------
+adapters:
+  copilot_cli:
+    billing_mode: per_call
+    bin: "copilot"
+    flags: ["--no-color"]
+    strength_tiers:
+      high:   {model: "claude-opus-4.7",   depth: deep}
+      medium: {model: "claude-sonnet-4.6", depth: normal}
+      low:    {model: "claude-haiku-4.5",  depth: shallow}
+  openai_gpt5:
+    billing_mode: per_token
+    model: "gpt-5"
+    api_key_env: "OPENAI_API_KEY"
+    strength_tiers: null
+  glm_4_5:
+    billing_mode: per_token
+    model: "glm-4.5-flash"
+    api_key_env: "ZHIPUAI_API_KEY"
+    strength_tiers: null
+
+# ---------------------------------------------------------------------------
+# Centralized strength routing: (agent, mode) -> strength
+# Dispatcher resolves: override -> exact -> wildcard "*" -> default
+# (AI_DISPATCHER.md §3)
+# ---------------------------------------------------------------------------
+strength_routing:
+  default: medium
+  alpha_gen:
+    explore:        medium
+    specialize:     high
+    review_failure: medium
+    track_news:     low
+  failure_analyzer:
+    "*":            medium
+  doc_summarizer:
+    "*":            low
+    crawl_summary:  low
+    recipe_synthesis: high
+    failure_synthesis: medium
+    portfolio_review: medium
+  portfolio_analyzer:
+    "*":            medium
+  crawler:
+    "*":            low
+  crawler_intent:
+    "*":            low
+
+# Concurrency limits (AI_DISPATCHER.md §6) — used by Dispatcher
+concurrency:
+  global_max: 4
+  per_adapter_max:
+    copilot_cli: 2
+    openai_gpt5: 4
+    glm_4_5: 4
+

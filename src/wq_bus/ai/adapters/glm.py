@@ -74,7 +74,12 @@ class GLMAdapter:
                         _log.warning("GLM 429 — retrying after %.1fs", retry_after)
                         await asyncio.sleep(retry_after)
                         continue
-                    resp.raise_for_status()
+                    if not (200 <= resp.status < 300):
+                        body = await resp.text()
+                        snippet = body[:500].replace("\n", " ")
+                        raise RuntimeError(
+                            f"GLM HTTP {resp.status}: {snippet}"
+                        )
                     data = await resp.json()
                     return data["choices"][0]["message"]["content"]
 

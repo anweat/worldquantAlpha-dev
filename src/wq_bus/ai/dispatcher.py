@@ -49,6 +49,17 @@ def _global_sem() -> asyncio.Semaphore:
     return _GLOBAL_SEMAPHORE
 
 
+class _NullAsyncContext:
+    """A no-op async context manager used when no per-adapter semaphore exists."""
+    async def __aenter__(self):  # noqa: D401
+        return self
+    async def __aexit__(self, exc_type, exc, tb):
+        return False
+
+
+_NULL_SEM = _NullAsyncContext()
+
+
 def get_dispatcher(**kwargs: Any) -> "Dispatcher":
     """Return the module-level singleton :class:`Dispatcher`.
 
@@ -405,9 +416,9 @@ class Dispatcher:
 
         async with _global_sem():
             adapter_sem = self._per_adapter_sem(adapter_name)
-            if adapter_sem is not None:
-                await adapter_sem.acquire()
-            try:
+            # Use async-with so a CancelledError during acquire never leaks the slot
+            sem_ctx = adapter_sem if adapter_sem is not None else _NULL_SEM
+            async with sem_ctx:
                 try:
                     self._cache.set_stage(pkg_id, "sent")
                     response_text = await self._call_with_retry(adapter, messages, model, depth)
@@ -448,9 +459,6 @@ class Dispatcher:
                             if isinstance(r, dict):
                                 r.setdefault("_ai_call_id", ai_call_id)
                                 r.setdefault("_package_id", pkg_id)
-            finally:
-                if adapter_sem is not None:
-                    adapter_sem.release()
 
         if success:
             self._cache.set_stage(pkg_id, "done")

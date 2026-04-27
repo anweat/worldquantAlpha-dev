@@ -188,8 +188,9 @@ class DefaultStockpile(WatchdogPolicy):
             with with_tag(tag):
                 state["queue_pending"] = state_db.queue_size("pending")
                 state["daily_ai_count"] = state_db.count_ai_calls_today()
-        except Exception:
-            pass
+        except Exception as exc:
+            _log.warning("build_state(%s): state_db read failed (%s) — using zero defaults", tag, exc)
+            state["_state_db_error"] = str(exc)
 
         try:
             from wq_bus.data._sqlite import open_knowledge
@@ -198,7 +199,8 @@ class DefaultStockpile(WatchdogPolicy):
                     f"SELECT * FROM pool_stats_{tag}"
                 ).fetchall()
                 state["pool_stats"] = [dict(r) for r in rows]
-        except Exception:
-            pass
+        except Exception as exc:
+            _log.warning("build_state(%s): pool_stats read failed (%s)", tag, exc)
+            state["_pool_stats_error"] = str(exc)
 
         return state
