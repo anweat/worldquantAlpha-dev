@@ -54,22 +54,10 @@ agents:
       - fail_reason_priority         # 本轮最常见失败原因
       - near_miss_list               # 近失败 alpha 列表（用于生成变异）
 
-  crawler:
-    label: "爬虫 Agent"
-    description: "爬取 WorldQuant 文档/社区内容，清洗后写入 crawl_docs"
-    provider: copilot
-    batch_size: 3
-    flush_secs: 30
-    context_sources:
-      - kb_crawl_docs_index          # crawl_docs 表（已爬 url_hash 列表，避免重复）
-      - config_crawl_targets         # crawl_targets.yaml（目标域名 + 期望内容描述）
-    output_files:
-      - data/knowledge.db            # crawl_docs 表（统一入库，不再写散文件）
-    impl: src/wq_bus/crawler/crawler_agent.py
-    key_prompt_params:
-      - target_urls_today            # 今日待爬 URL 列表（来自 crawl_targets.yaml）
-      - already_crawled_urls         # 已爬 URL（来自 crawl_docs 表）
-      - cleaning_instructions        # 内容清洗规则（来自 crawl_targets.yaml）
+  # NOTE: 'crawler' agent removed 2026-04-27 — crawler_agent.py does not call
+  # dispatcher.call(); it fetches/parses HTML directly and writes to crawl_docs.
+  # No code consumes this profile entry. Re-add only if crawler is wired
+  # through the AI dispatcher in the future.
 
   portfolio_analyzer:
     label: "Pool 组合分析 Agent（事件驱动）"
@@ -88,22 +76,9 @@ agents:
       - analysis_scope               # 分析范围：all / recent_30d / by_category
       - comparison_date              # 与哪日的分析做对比
 
-  daily_reporter:
-    label: "日报 Agent"
-    description: "生成每日 markdown 报告 + next_session_context.md"
-    provider: copilot
-    batch_size: 1
-    flush_secs: 5
-    context_sources:
-      - kb_today_stats
-      - kb_history_7d
-      - kb_recent_learnings_7d
-      - kb_fail_reasons_7d
-      - kb_top_passing_alphas_10
-      - memory_portfolio_analysis    # 引用最新组合分析摘要
-    output_files:
-      - results/reports/daily_{date}.md
-      - memory/next_session_context.md   # Copilot CLI 专用高密度上下文
+  # NOTE: 'daily_reporter' agent removed 2026-04-27 — no code class with
+  # AGENT_TYPE='daily_reporter'. Daily report generation is currently
+  # handled by scripts (see daily_workflow.py), not by an Agent subclass.
 
   doc_summarizer:
     label: "文档总结 Agent"
@@ -112,11 +87,9 @@ agents:
     batch_size: 5
     flush_secs: 30
 
-  crawler_intent:
-    label: "爬虫意图识别 Agent"
-    provider: copilot
-    batch_size: 3
-    flush_secs: 30
+  # NOTE: 'crawler_intent' agent removed 2026-04-27 — no code class
+  # with AGENT_TYPE='crawler_intent'. Intent classification was never
+  # implemented as a separate agent.
 
 # Defaults consumed by ModelRouter when an agent omits a field
 defaults:
@@ -169,10 +142,7 @@ strength_routing:
     portfolio_review: medium
   portfolio_analyzer:
     "*":            medium
-  crawler:
-    "*":            low
-  crawler_intent:
-    "*":            low
+  # crawler / crawler_intent strength entries removed with their agent definitions
 
 # Concurrency limits (AI_DISPATCHER.md §6) — used by Dispatcher
 concurrency:
