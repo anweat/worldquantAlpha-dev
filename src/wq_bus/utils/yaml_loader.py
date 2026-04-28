@@ -7,7 +7,7 @@ from typing import Any
 
 import yaml
 
-PROJECT_ROOT = Path(__file__).resolve().parents[3]
+from wq_bus.utils.paths import PROJECT_ROOT  # noqa: E402
 CONFIG_DIR = PROJECT_ROOT / "config"
 
 

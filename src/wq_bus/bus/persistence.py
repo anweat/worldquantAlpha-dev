@@ -35,7 +35,13 @@ def replay_unconsumed(bus, *, dataset_tag: str | None = None) -> int:
     bus._mirror_enabled = False
     try:
         for row in rows:
-            evt = make_event(row["topic"], row["dataset_tag"], **_decode_payload(row["payload_json"]))
+            payload = _decode_payload(row["payload_json"])
+            # Strip trace_id from payload (it's a top-level Event field, not payload)
+            # Preserve original trace_id so replayed events stay attached to their
+            # source trace (otherwise replay orphans every trace as 'running').
+            trace_id = row["trace_id"] if "trace_id" in row.keys() else payload.pop("trace_id", None)
+            evt = make_event(row["topic"], row["dataset_tag"],
+                             trace_id=trace_id, **payload)
             bus.emit(evt)
             state_db.mark_event_consumed(row["id"])
             n += 1

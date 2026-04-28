@@ -1,0 +1,63 @@
+prompt_kind: alpha_gen.repair
+description: Repair-mode generation seeded with mutation tasks from failure_summary.
+
+variables:
+  - dataset_tag
+  - n
+  - mutation_tasks
+  - top_directions
+  - available_docs
+
+system: |
+  You are repairing failed alpha factors for the WorldQuant BRAIN platform.
+  Each mutation_task lists a *concrete* failed expression and a guided fix
+  (lower turnover, swap operator, neutralize differently, etc.). Apply the
+  guidance literally — do not invent unrelated alphas.
+
+  STRICT OPERATOR WHITELIST (use ONLY these 66; any other name is rejected):
+    abs, add, and, bucket, days_from_last_change, densify, divide, equal, greater,
+    greater_equal, group_backfill, group_mean, group_neutralize, group_rank,
+    group_scale, group_zscore, hump, if_else, inverse, is_nan, kth_element,
+    last_diff_value, less, less_equal, log, max, min, multiply, normalize, not,
+    not_equal, or, power, quantile, rank, reverse, scale, sign, signed_power,
+    sqrt, subtract, trade_when, ts_arg_max, ts_arg_min, ts_av_diff, ts_backfill,
+    ts_corr, ts_count_nans, ts_covariance, ts_decay_linear, ts_delay, ts_delta,
+    ts_mean, ts_product, ts_quantile, ts_rank, ts_regression, ts_scale,
+    ts_std_dev, ts_step, ts_sum, ts_zscore, vec_avg, vec_sum, winsorize, zscore.
+  ts_lag → ts_delay; ts_max/ts_min/ts_median/ts_skew do NOT exist.
+
+user: |
+  Dataset: {{dataset_tag}}
+  Generate {{n}} repaired FE expressions.
+
+  ━━━ STRATEGY ━━━
+  - For each `mutation_task`, produce 1-2 fix attempts (different mechanisms).
+  - If you have spare slots after covering every task, fill them with
+    DIVERSITY VARIANTS of the highest-priority repairs (different operator
+    family, different smoothing window, different neutralization scope).
+  - HARD CONSTRAINT (turnover): wrap every short-window technical with
+    ts_decay_linear(expr, 15..25) OR ts_rank(expr, 60..252). Prefer
+    fundamental fields when the failure was HIGH_TURNOVER.
+
+  Mutation tasks:
+  {{mutation_tasks}}
+
+  Top template directions (use as scaffolds where applicable):
+  {{top_directions}}
+
+  ━━━ OPTIONAL DEEPER CONTEXT (read on demand via your `view` tool) ━━━
+  Project files for grounding (consult only if needed):
+  {{available_docs}}
+
+  ━━━ OUTPUT FORMAT (strict JSON) ━━━
+  {
+    "alphas": [
+      {
+        "expression": "<FE>",
+        "rationale": "<one sentence — what fix this applies>",
+        "direction_hint": "<theme>",
+        "applied_to_task_index": <int — index in mutation_tasks, or -1 for diversity-variant>
+      }
+      // ... exactly {{n}} items
+    ]
+  }

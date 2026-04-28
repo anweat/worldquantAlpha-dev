@@ -102,7 +102,25 @@ class AgentBase:
     # ------------------------------------------------------------------
 
     async def _safe_dispatch(self, event: Event) -> None:
-        """Wrap _dispatch with exception handling; emit TASK_FAILED on error."""
+        """Wrap _dispatch with exception handling; emit TASK_FAILED on error.
+
+        Cooperative pause/cancel: if the event's trace is paused or cancelled,
+        skip the handler entirely. Pause keeps the trace alive (caller may
+        resume); cancel drops it permanently.
+        """
+        try:
+            from wq_bus.bus.tasks import is_paused, is_cancelled
+            tid = getattr(event, "trace_id", None)
+            if tid and is_cancelled(tid):
+                self.log.debug("agent=%s skip cancelled trace=%s topic=%s",
+                               self.AGENT_TYPE, tid, event.topic)
+                return
+            if tid and is_paused(tid):
+                self.log.debug("agent=%s skip paused trace=%s topic=%s",
+                               self.AGENT_TYPE, tid, event.topic)
+                return
+        except Exception:
+            pass
         t0 = time.monotonic()
         try:
             await self._dispatch(event)
@@ -195,11 +213,133 @@ class AgentBase:
     # ------------------------------------------------------------------
 
     async def call_ai(self, payload: dict, *, force_immediate: bool = False) -> dict:
+        """DEPRECATED — direct dispatcher.call path; use ai_request() instead.
+
+        Retained as a back-compat shim for doc_summarizer's legacy modes whose
+        prompts are still built inside dispatcher.call rather than in
+        prompt_registry. New code MUST go through ai_request().
+        """
         if not self.dispatcher:
             raise RuntimeError(f"{self.AGENT_TYPE} has no dispatcher attached")
+        if not getattr(self, "_call_ai_deprecation_logged", False):
+            self.log.warning(
+                "%s.call_ai() is deprecated; migrate to ai_request() (R6-C).",
+                self.AGENT_TYPE,
+            )
+            self._call_ai_deprecation_logged = True
         return await self.dispatcher.call(
             self.AGENT_TYPE, payload, force_immediate=force_immediate
         )
+
+    # ------------------------------------------------------------------
+    # ai_request: bus-driven AI call (R6-C agent <-> AIService protocol)
+    # ------------------------------------------------------------------
+    # Emits AI_CALL_REQUESTED with a fresh call_id, then awaits AI_CALL_DONE
+    # /FAILED with the matching call_id. AIService renders the prompt via
+    # prompt_registry, calls the dispatcher, and emits the result.
+    # Returns the response dict (or None on failure).
+    #
+    # Usage in a handler:
+    #     resp = await self.ai_request(
+    #         "failure_summary",
+    #         {"dataset_tag": tag, "failures": [...], "existing_patterns": [...]},
+    #         timeout=300,
+    #     )
+    # ------------------------------------------------------------------
+    async def ai_request(
+        self,
+        prompt_kind: str,
+        vars: dict,
+        *,
+        agent: str | None = None,
+        timeout: float | None = 300.0,
+        adapter_hint: str | None = None,
+        model_hint: str | None = None,
+    ) -> dict | None:
+        import asyncio
+        import uuid
+
+        from wq_bus.bus.events import (
+            AI_CALL_DONE, AI_CALL_FAILED, AI_CALL_REQUESTED, make_event,
+        )
+        from wq_bus.utils.tag_context import get_tag, get_trace_id
+
+        # Lazy: register the matched-pair listener once per agent instance.
+        if not getattr(self, "_ai_listener_attached", False):
+            self._ai_pending: dict[str, asyncio.Future] = {}
+            self.bus.subscribe(AI_CALL_DONE, self._on_ai_call_done)
+            self.bus.subscribe(AI_CALL_FAILED, self._on_ai_call_failed)
+            self._ai_listener_attached = True
+
+        call_id = f"{self.AGENT_TYPE}_{uuid.uuid4().hex[:10]}"
+        loop = asyncio.get_running_loop()
+        fut: asyncio.Future = loop.create_future()
+        self._ai_pending[call_id] = fut
+        tag = get_tag() or "_global"
+        trace_id = get_trace_id() or ""
+        try:
+            self.bus.emit(make_event(
+                AI_CALL_REQUESTED,
+                dataset_tag=tag,
+                call_id=call_id,
+                prompt_kind=prompt_kind,
+                vars=vars,
+                agent=agent or self.AGENT_TYPE,
+                adapter_hint=adapter_hint,
+                model_hint=model_hint,
+                trace_id=trace_id,
+            ))
+        except Exception:
+            self._ai_pending.pop(call_id, None)
+            raise
+        try:
+            res = await asyncio.wait_for(fut, timeout=timeout) if timeout else await fut
+        except asyncio.TimeoutError:
+            self.log.warning(
+                "ai_request timeout agent=%s prompt_kind=%s call_id=%s",
+                self.AGENT_TYPE, prompt_kind, call_id,
+            )
+            self._ai_pending.pop(call_id, None)
+            return None
+        return res
+
+    async def _on_ai_call_done(self, event: Event) -> None:
+        cid = (event.payload or {}).get("call_id")
+        if not cid:
+            return
+        # Multi-agent: ignore call_ids that don't belong to this agent.
+        if not cid.startswith(f"{self.AGENT_TYPE}_"):
+            return
+        pending = getattr(self, "_ai_pending", {})
+        fut = pending.pop(cid, None)
+        if fut is None:
+            # Late response — request already timed out, OR this event belongs
+            # to a sibling instance of the same agent type (multi-workspace).
+            # Either way it is normal; demote from WARNING to DEBUG.
+            self.log.debug(
+                "%s: AI_CALL_DONE for unknown/timed-out call_id=%s (response dropped)",
+                self.AGENT_TYPE, cid,
+            )
+            return
+        if not fut.done():
+            fut.set_result((event.payload or {}).get("response"))
+
+    async def _on_ai_call_failed(self, event: Event) -> None:
+        cid = (event.payload or {}).get("call_id")
+        if not cid:
+            return
+        if not cid.startswith(f"{self.AGENT_TYPE}_"):
+            return
+        pending = getattr(self, "_ai_pending", {})
+        fut = pending.pop(cid, None)
+        if fut is None:
+            self.log.debug(
+                "%s: AI_CALL_FAILED for unknown/timed-out call_id=%s",
+                self.AGENT_TYPE, cid,
+            )
+            return
+        if not fut.done():
+            fut.set_result(None)
 
     async def health(self) -> dict:
         return {"ok": True, "agent": self.AGENT_TYPE}

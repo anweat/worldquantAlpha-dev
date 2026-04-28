@@ -1,0 +1,138 @@
+# context_templates.yaml - 上下文模板配置
+#
+# 定义各类型Agent的上下文模板、压缩规则、字段裁剪策略
+# 目标：减少token消耗，优化AI调用效率
+
+global:
+  max_context_tokens: 8000
+  compression_threshold: 0.7          # 超过70%时启用压缩
+  token_estimation: char_based        # 简单估算：1 token ≈ 4 chars
+  incremental_updates: true           # 增量更新上下文
+
+compression_rules:
+  enabled: true
+  strategies:
+    - name: truncate_long_lists
+      trigger: "list_length > max_items"
+      action: "keep_first_and_last"
+    - name: summarize_numeric_arrays
+      trigger: "array_length > 20"
+      action: "compute_statistics"
+    - name: deduplicate_entries
+      trigger: "similarity > 0.8"
+      action: "merge_with_best"
+
+templates:
+  alpha_gen:
+    name: "Alpha生成上下文"
+    description: "生成新Alpha候选时的上下文模板"
+    base_template: "templates/alpha_gen.md"
+    required_fields:
+      - kb_stats
+      - best_categories
+      - mutation_hints
+      - dataset_settings
+    optional_fields:
+      - top_passing_alphas
+      - worst_categories
+      - recent_learnings
+      - top_fail_reason
+    compression:
+      top_passing_alphas:
+        max_items: 10
+        keep_fields: ["name", "category", "sharpe", "fitness", "expr_truncated"]
+        truncate_expr: 100           # 截断表达式到100字符
+      recent_learnings:
+        max_items: 5
+        keep_fields: ["date", "category", "insight"]
+      fail_reasons_7d:
+        max_items: 10
+        aggregation: top_by_count
+      top_templates_by_pass_rate:
+        max_items: 15
+    output:
+      file_pattern: "memory/ctx_{agent_type}_{timestamp}.json"
+      keep_latest: 3                 # 保留最近3个版本
+
+  failure_analyzer:
+    name: "失败分析上下文"
+    description: "分析失败模式时的上下文模板"
+    base_template: "templates/failure_analyzer.md"
+    required_fields:
+      - failed_alphas_recent
+      - dataset_settings
+      - current_fail_counts
+    optional_fields:
+      - near_miss_alphas
+    compression:
+      failed_alphas_recent:
+        max_items: 50
+        keep_fields: ["expr", "category", "fail_reasons", "sharpe", "fitness", "settings"]
+        truncate_expr: 150
+      near_miss_alphas:
+        max_items: 20
+
+  crawler:
+    name: "爬虫上下文"
+    description: "爬虫知识提取时的上下文模板"
+    base_template: "templates/crawler.md"
+    required_fields:
+      - target_urls_today
+      - crawl_targets_config
+    compression:
+      target_urls_today:
+        max_items: 30
+      crawl_targets_config:
+        max_items: 10
+        keep_fields: ["name", "base_url", "expected_content"]
+
+  portfolio:
+    name: "组合分析上下文"
+    description: "组合分析时的上下文模板"
+    base_template: "templates/portfolio.md"
+    required_fields:
+      - kb_stats
+      - all_time_category_rates
+      - top_passing_alphas
+    compression:
+      top_passing_alphas:
+        max_items: 50
+
+  daily_report:
+    name: "日报上下文"
+    description: "生成日报时的上下文模板"
+    base_template: "templates/daily_report.md"
+    required_fields:
+      - today_stats
+      - kb_stats
+      - history_7d
+      - recent_learnings
+    compression:
+      history_7d:
+        max_items: 8
+      recent_learnings:
+        max_items: 10
+
+prompts:
+  system_role: |
+    You are an expert quantitative researcher specializing in alpha factor development
+    for the WorldQuant BRAIN platform. You have deep knowledge of:
+    - Fast Expression (FE) syntax and operators
+    - Factor portfolio construction and risk management
+    - Statistical analysis and machine learning
+    - Financial market microstructure
+
+  generation_guidance: |
+    When generating alpha candidates:
+    1. Prioritize low-turnover fundamental factors (turnover < 5%)
+    2. Use SUBINDUSTRY neutralization for better Sharpe ratios
+    3. Target fitness >= 1.0 as success criteria
+    4. Avoid data sources with high self-correlation failure rates
+    5. Generate diverse candidates across different data domains
+
+  iteration_guidance: |
+    For iterative refinement:
+    1. Start with conservative settings (decay=0, truncation=0.08)
+    2. Apply mutations based on failure patterns
+    3. Prefer fundamental fields for stability
+    4. Limit each iteration to 10-20 candidates for feedback quality

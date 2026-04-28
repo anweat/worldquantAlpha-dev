@@ -33,6 +33,25 @@ class SelfCorrChecker(AgentBase):
         record = event.payload.get("alpha_record")
         tag = event.dataset_tag
 
+        # Dry-run short-circuit: synthetic alpha_ids (DRY-prefixed by sim_executor)
+        # have no real BRAIN record. Synthesize a PASS to keep pipeline flowing.
+        import os as _os
+        if alpha_id.startswith("DRY") and _os.environ.get("WQBUS_DRY", "").lower() in ("1","true","yes","on"):
+            self.log.info("SC dry-run pass alpha=%s (synthetic)", alpha_id)
+            knowledge_db.upsert_alpha(
+                alpha_id, "", {}, settings_hash="",
+                sc_metrics={"value": 0.0, "passed": True}, status="sc_passed",
+            )
+            state_db.enqueue_submission(
+                alpha_id, is_metrics={}, sc_value=0.0, priority=0,
+                note="dry-run auto-enqueue",
+            )
+            self.bus.emit(make_event(Topic.QUEUE_FLUSH_REQUESTED, tag,
+                                     source="self_corr_checker", alpha_id=alpha_id))
+            self.bus.emit(make_event(Topic.SC_RESULT, tag,
+                                     alpha_id=alpha_id, sc_value=0.0, passed=True))
+            return
+
         # If SC is still PENDING, poll up to N times waiting for BRAIN to compute it.
         # TUTORIAL accounts can take 5-10 min for SELF_CORRELATION to resolve.
         loop = asyncio.get_running_loop()

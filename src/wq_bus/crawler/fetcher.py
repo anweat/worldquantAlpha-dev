@@ -3,16 +3,37 @@
 fetch_html  — aiohttp, no system proxy, optional cookie injection
 fetch_spa   — Playwright async, full JS rendering
 clean_html  — BeautifulSoup-based CSS-selector stripping → markdown-ish text
+
+All HTTP fetches go through the robots.txt gate (see robots.py): whitelisted
+WorldQuant domains are exempt; other domains have Disallow rules strictly
+honoured and Crawl-delay observed via asyncio.sleep().
 """
 from __future__ import annotations
 
+import asyncio
 import re
 from typing import Any
 
 from wq_bus.crawler.auth_store import load_cookies
+from wq_bus.crawler.robots import (
+    RobotsDisallowed, get_robots_gate, is_robots_check_enabled,
+)
 from wq_bus.utils.logging import get_logger
 
 log = get_logger(__name__)
+
+
+async def _enforce_robots(url: str) -> None:
+    """Block on robots.txt before a request. No-op when check disabled."""
+    if not is_robots_check_enabled():
+        return
+    allowed, delay = await get_robots_gate().is_allowed(url)
+    if not allowed:
+        log.warning("robots.txt disallows fetch: %s", url)
+        raise RobotsDisallowed(f"robots.txt disallow: {url}")
+    if delay > 0:
+        log.debug("robots.txt crawl-delay=%.1fs for %s", delay, url)
+        await asyncio.sleep(delay)
 
 
 # ---------------------------------------------------------------------------
@@ -34,6 +55,8 @@ async def fetch_html(
         import aiohttp
     except ImportError as exc:
         raise ImportError("aiohttp is required for fetch_html: pip install aiohttp") from exc
+
+    await _enforce_robots(url)
 
     cookies: dict[str, Any] = {}
     if source:
@@ -80,6 +103,8 @@ async def fetch_spa(
         raise ImportError(
             "playwright is required for fetch_spa: pip install playwright && playwright install chromium"
         ) from exc
+
+    await _enforce_robots(url)
 
     cookies_dict = {}
     if source:

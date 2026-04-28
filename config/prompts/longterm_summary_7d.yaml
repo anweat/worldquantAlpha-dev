@@ -1,0 +1,28 @@
+prompt_kind: longterm_summary_7d
+description: Weekly retrospective + next-week strategy.
+
+variables:
+  - week_range
+  - workspaces
+  - global_metrics
+  - direction_evolution
+
+system: |
+  You write strategic weekly retrospectives. Be opinionated, point at
+  divergences, and propose 1-3 strategy adjustments grounded in the data.
+
+user: |
+  Week: {{week_range}}
+  Workspaces: {{workspaces}}
+  Global metrics over 7d: {{global_metrics}}
+  Direction evolution (week-over-week): {{direction_evolution}}
+
+  Respond with strict JSON:
+  {
+    "headline": "<1 sentence>",
+    "wins": ["<bullet>"],
+    "losses": ["<bullet>"],
+    "strategy_adjustments": [
+      {"name": "<short>", "rationale": "<sentence>", "concrete_action": "<sentence>"}
+    ]
+  }

@@ -26,7 +26,7 @@ from wq_bus.bus.events import (
 from wq_bus.data import knowledge_db
 from wq_bus.utils.yaml_loader import load_yaml
 
-PROJECT_ROOT = Path(__file__).resolve().parents[3]
+from wq_bus.utils.paths import PROJECT_ROOT  # noqa: E402
 MEMORY_DIR = PROJECT_ROOT / "memory"
 
 
@@ -217,56 +217,33 @@ class DocSummarizer(AgentBase):
 
     async def on_failure_batch_ready(self, event: Event) -> None:
         tag = event.dataset_tag
-        from wq_bus.data._sqlite import open_knowledge
+        # rev-h7: delegate failure curation (split + dedupe + cap) to
+        # CuratedContext. The agent only owns the AI call + persistence.
+        from wq_bus.ai.context_curator import CuratedContext
         from wq_bus.utils.tag_context import with_tag
 
         with with_tag(tag):
-            with open_knowledge() as conn:
-                rows = conn.execute(
-                    """SELECT alpha_id, expression, status, sharpe, fitness, turnover,
-                              is_metrics_json, themes_csv
-                       FROM alphas
-                       WHERE dataset_tag=?
-                         AND status IN ('simulated','is_passed')
-                         AND (sharpe IS NULL OR sharpe < 1.25
-                              OR fitness IS NULL OR fitness < 1.0
-                              OR turnover > 0.7 OR turnover < 0.01)
-                       ORDER BY updated_at DESC LIMIT 50""",
-                    (tag,),
-                ).fetchall()
+            curated = CuratedContext(
+                agent_type="doc_summarizer.failure_synthesis",
+                mode="failure_synthesis",
+                tag=tag,
+            ).build()
 
-        failures = [dict(r) for r in rows]
-        if not failures:
+        hard = curated.get("hard_failures", [])
+        near = curated.get("near_miss", [])
+        if not hard and not near:
             return
-
-        # Split near-miss (sharpe>=0.8) vs hard failures so AI can prioritise.
-        def _sh(f: dict) -> float:
-            try:
-                return float(f.get("sharpe") or 0.0)
-            except Exception:
-                return 0.0
-
-        near = sorted([f for f in failures if _sh(f) >= 0.8], key=_sh, reverse=True)[:15]
-        near_ids = {f.get("alpha_id") for f in near}
-        hard = [f for f in failures if f.get("alpha_id") not in near_ids][:30]
-
-        def _row(f: dict) -> dict:
-            return {
-                "alpha_id":   f.get("alpha_id"),
-                "expression": (f.get("expression") or "")[:200],
-                "sharpe":     f.get("sharpe"),
-                "fitness":    f.get("fitness"),
-                "turnover":   f.get("turnover"),
-            }
-
-        prior = self._load_prior_failure_patterns(tag)
 
         payload = {
             "mode":          "failure_synthesis",
             "dataset_tag":   tag,
-            "failures":      [_row(f) for f in hard],
-            "near_miss":     [_row(f) for f in near],
-            "prior_patterns": prior,
+            "failures":      hard,
+            "near_miss":     near,
+            "prior_patterns": {
+                "patterns":       curated.get("prior_patterns", []),
+                "mutation_tasks": [],
+            },
+            "_curator_meta": curated.get("_curator_meta", {}),
         }
         try:
             result = await self.call_ai(payload, force_immediate=True)
@@ -412,9 +389,7 @@ class DocSummarizer(AgentBase):
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _utcnow_iso() -> str:
-    from datetime import datetime, timezone
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+from wq_bus.utils.timeutil import utcnow_iso as _utcnow_iso  # noqa: E402
 
 
 def _make_recipe_id(semantic_name: str) -> str:

@@ -1,0 +1,27 @@
+prompt_kind: diversity_analysis
+description: Portfolio coverage / direction gap analysis.
+
+variables:
+  - dataset_tag
+  - submitted_directions
+  - explored_directions
+  - all_directions
+
+system: |
+  You analyze portfolio diversity: which research directions are over-
+  represented in submissions, which are under-explored, and which are
+  fully unexplored.
+
+user: |
+  Dataset: {{dataset_tag}}
+  Submitted directions: {{submitted_directions}}
+  Explored (any depth) directions: {{explored_directions}}
+  All directions in pool: {{all_directions}}
+
+  Respond with strict JSON:
+  {
+    "over_represented": ["<direction_id>", ...],
+    "under_explored":   ["<direction_id>", ...],
+    "fully_unexplored": ["<direction_id>", ...],
+    "recommendation":   "<1 paragraph>"
+  }

@@ -187,3 +187,28 @@ field_class_map:
   fx_rate:               macro
   vix:                   macro
 
+  # ─── analyst_estimates / valuation extras ────────────────────────────────
+  est_eps:               fundamental.absolute
+  est_fcf:               fundamental.absolute
+  est_revenue:           fundamental.absolute
+  est_ebitda:            fundamental.absolute
+  # ─── news_sentiment ─────────────────────────────────────────────────────
+  snt1_buzz:             news_sentiment
+  snt1_sentiment:        news_sentiment
+  scl12_buzz:            news_sentiment
+  rp_css:                news_sentiment
+  nws12_sentiment:       news_sentiment
+  # ─── options ────────────────────────────────────────────────────────────
+  implied_volatility:    options
+  pcr_oi:                options
+  pcr_volume:            options
+  parkinson:             options
+  iv_skew:               options
+  # ─── short_interest ─────────────────────────────────────────────────────
+  short_interest:        short_interest
+  short_ratio:           short_interest
+  days_to_cover:         short_interest
+  # ─── cashflow extras ────────────────────────────────────────────────────
+  capex:                 cashflow
+  operating_cash_flow:   cashflow
+

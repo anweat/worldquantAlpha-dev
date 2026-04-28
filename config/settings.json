@@ -1,0 +1,112 @@
+{
+  "version": "1.0.0",
+  "project": "WorldQuant Alpha Research AI Workflow",
+  
+  "brain_api": {
+    "base_url": "https://api.worldquantbrain.com",
+    "api_version": "2.0",
+    "region": "USA",
+    "universe": "TOP3000",
+    "delay": 1
+  },
+
+  "session": {
+    "state_file": ".state/session.json",
+    "auto_refresh": true,
+    "refresh_threshold_hours": 24
+  },
+
+  "datasets": [
+    {
+      "tag": "usa_top3000",
+      "label": "USA TOP3000",
+      "region": "USA",
+      "universe": "TOP3000",
+      "active": true
+    },
+    {
+      "tag": "usa_top1000",
+      "label": "USA TOP1000",
+      "region": "USA",
+      "universe": "TOP1000",
+      "active": false
+    },
+    {
+      "tag": "europe_top1200",
+      "label": "Europe TOP1200",
+      "region": "EUROPE",
+      "universe": "TOP1200",
+      "active": false
+    },
+    {
+      "tag": "china_a500",
+      "label": "China A500",
+      "region": "CHN",
+      "universe": "TOP500",
+      "active": false
+    }
+  ],
+
+  "ai_providers": {
+    "primary": {
+      "type": "copilot",
+      "mode": "server",
+      "endpoint": "http://localhost:8080",
+      "timeout": 120
+    },
+    "secondary": {
+      "type": "openai",
+      "endpoint": "http://localhost:8081",
+      "timeout": 60
+    }
+  },
+
+  "workflow": {
+    "max_rounds": 5,
+    "budget_per_round": 400,
+    "target_submitted": 5,
+    "auto_submit": true,
+    "max_sub_agents": 4
+  },
+
+  "submission": {
+    "sharpe_min": 1.25,
+    "fitness_min": 1.0,
+    "turnover_min": 0.01,
+    "turnover_max": 0.70,
+    "checks_required": ["SELF_CORRELATION", "UNIVERSE_SHARPE", "BETA"]
+  },
+
+  "memory": {
+    "db_path": "data/unified_kb.db",
+    "retention": {
+      "failure_patterns": 30,
+      "learnings": -1,
+      "submitted_alphas": 365,
+      "default": 90
+    }
+  },
+
+  "context": {
+    "max_tokens": 8000,
+    "compression_threshold": 10000,
+    "include_kb_stats": true,
+    "include_dataset_settings": true,
+    "include_best_categories": true
+  },
+
+  "crawler": {
+    "max_depth": 4,
+    "max_pages": 30,
+    "targets": [
+      "https://platform.worldquantbrain.com/learn",
+      "https://www.worldquant.com/simulate/"
+    ]
+  },
+
+  "logging": {
+    "level": "INFO",
+    "file": "logs/workflow.log",
+    "console": true
+  }
+}

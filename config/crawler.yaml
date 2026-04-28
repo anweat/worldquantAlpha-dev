@@ -1,0 +1,95 @@
+# crawler.yaml - 爬虫与知识提取配置
+#
+# 控制AI爬虫的知识理解、总结、递进功能
+
+crawler:
+  enabled: true
+  max_pages_per_run: 30
+  delay_between_requests: 2
+  respect_robots_txt: true
+  retry_on_failure: true
+  max_retries: 2
+
+  # robots.txt gate (rev-h6): whitelisted hosts skip the check entirely
+  # because we have explicit account/contract permission. Subdomains match
+  # via suffix (e.g. "worldquantbrain.com" covers "platform.worldquantbrain.com").
+  user_agent: "wq-bus-crawler/1.0 (+contact: research)"
+  robots_cache_ttl_secs: 86400
+  robots_whitelist_domains:
+    - platform.worldquantbrain.com
+    - api.worldquantbrain.com
+    - support.worldquantbrain.com
+    - wqplatform.zendesk.com
+
+  targets:
+    - wq_official_docs
+    - wq_zendesk
+    - community_wisdom
+    - academic_alpha_research
+
+ai_processing:
+  enabled: true
+  batch_size: 5                       # 每次处理5个页面
+
+  understanding:
+    prompt_template: "templates/crawler_understand.md"
+    extract_fields:
+      - factor_types                  # 因子类型
+      - data_requirements             # 数据需求
+      - suggested_operators          # 建议的运算符
+      - example_expressions          # 示例表达式
+      - success_patterns             # 成功模式
+
+  summarization:
+    enabled: true
+    max_length: 500                   # 最大摘要长度
+    style: concise                     # concise, detailed, bullet_points
+    include_keywords: true
+
+  knowledge递进:
+    enabled: true
+    strategy: incremental              # incremental, rebuild
+    max_depth: 3                       # 最大递进深度
+
+    levels:
+      - level: 1
+        name: "Surface"
+        prompt: "Extract basic facts and definitions"
+      - level: 2
+        name: "Intermediate"
+        prompt: "Identify patterns and relationships"
+      - level: 3
+        name: "Deep"
+        prompt: "Extract strategic insights and best practices"
+
+  knowledge_storage:
+    path: "memory/knowledge_base"
+    format: json
+    deduplicate: true
+    similarity_threshold: 0.85        # 去重相似度阈值
+
+schedule:
+  frequency: daily
+  run_time: "01:00"                    # 凌晨1点运行
+  max_duration_hours: 4
+
+  priorities:
+    high:
+      - wq_official_docs
+      - wq_zendesk
+    medium:
+      - community_wisdom
+    low:
+      - academic_alpha_research
+
+quality_control:
+  min_content_length: 200             # 最小内容长度
+  max_content_length: 50000           # 最大内容长度
+  validate_structure: true
+  check_duplicates: true
+
+  filters:
+    - type: language
+      language: en
+    - type: relevance
+      min_score: 0.5

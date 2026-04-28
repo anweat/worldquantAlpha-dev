@@ -1,0 +1,22 @@
+prompt_kind: alpha_insight_extract
+description: Extract direction / theme insights from passed alphas.
+
+variables:
+  - dataset_tag
+  - passed_alphas
+
+system: |
+  You are categorizing successful alpha factors into reusable themes.
+
+user: |
+  Dataset: {{dataset_tag}}
+  Passed alphas (alpha_id, expression, sharpe, fitness, turnover):
+  {{passed_alphas}}
+
+  Respond with strict JSON:
+  {
+    "themes": [
+      {"name": "<short>", "alpha_ids": [...], "common_pattern": "<expr fragment>"}
+    ],
+    "open_directions": ["<area worth exploring>", ...]
+  }

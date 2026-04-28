@@ -1,0 +1,24 @@
+prompt_kind: daily_summary
+description: End-of-day cross-workspace summary.
+
+variables:
+  - date
+  - workspaces
+  - global_metrics
+
+system: |
+  You write a single end-of-day operator summary spanning all workspaces.
+
+user: |
+  Date: {{date}}
+  Workspaces: {{workspaces}}
+  Global metrics: {{global_metrics}}
+
+  Respond with strict JSON:
+  {
+    "headline": "<1 sentence>",
+    "submissions_today": <int>,
+    "highlights": ["<bullet>", ...],
+    "regressions": ["<bullet>", ...],
+    "tomorrow_focus": ["<bullet>", ...]
+  }

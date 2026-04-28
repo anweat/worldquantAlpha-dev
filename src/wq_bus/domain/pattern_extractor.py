@@ -273,7 +273,7 @@ def run_extract_cli(
     result = [g.to_dict() for g in groups]
 
     if out_path is None:
-        project_root = Path(__file__).resolve().parents[3]
+        from wq_bus.utils.paths import PROJECT_ROOT as project_root
         out_path = project_root / "data" / f"recipe_candidates_{tag}.json"
 
     out_path.parent.mkdir(parents=True, exist_ok=True)

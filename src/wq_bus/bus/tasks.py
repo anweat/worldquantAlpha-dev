@@ -19,13 +19,12 @@ from wq_bus.utils.logging import get_logger
 
 _log = get_logger(__name__)
 
-TaskStatus = Literal["running", "completed", "failed", "cancelled", "timeout"]
+TaskStatus = Literal["running", "completed", "failed", "cancelled", "timeout", "paused"]
 
 _TAG_RE = re.compile(r"^[A-Z]+_[A-Z0-9]+$")
 
 
-def _utcnow_iso() -> str:
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+from wq_bus.utils.timeutil import utcnow_iso as _utcnow_iso  # noqa: E402
 
 
 def _new_trace_id() -> str:
@@ -178,25 +177,150 @@ def complete_task(trace_id: str, data: dict | None = None) -> None:
 
     Order: DB update FIRST so that on a crash between in-memory and DB updates,
     the trace ends up marked completed in DB rather than orphaned as 'running'.
+    If DB write fails, log loudly and skip in-memory resolution so caller
+    state and DB stay consistent.
     """
-    _update_trace_status(trace_id, "completed")
+    try:
+        _update_trace_status(trace_id, "completed")
+    except Exception:
+        _log.exception("complete_task: DB update failed for %s — skipping resolution", trace_id)
+        return
     h = _HANDLES.pop(trace_id, None)
     if h:
         h._resolve_complete(data)
 
 
 def fail_task(trace_id: str, error: str | Exception) -> None:
-    _update_trace_status(trace_id, "failed", error=str(error))
+    try:
+        _update_trace_status(trace_id, "failed", error=str(error))
+    except Exception:
+        _log.exception("fail_task: DB update failed for %s", trace_id)
+        return
     h = _HANDLES.pop(trace_id, None)
     if h:
         h._resolve_fail(error)
 
 
 def timeout_task(trace_id: str) -> None:
-    _update_trace_status(trace_id, "timeout", error="supervisor timeout")
+    try:
+        _update_trace_status(trace_id, "timeout", error="supervisor timeout")
+    except Exception:
+        _log.exception("timeout_task: DB update failed for %s", trace_id)
+        return
     h = _HANDLES.pop(trace_id, None)
     if h:
         h._resolve_timeout()
+
+
+# ---------------------------------------------------------------------------
+# Pause / resume / cancel primitives (R6-B web control)
+# ---------------------------------------------------------------------------
+#
+# Pause/cancel are *cooperative*: agents check trace status (or the in-memory
+# lookaside sets) before processing each event. They do NOT preempt currently
+# running handlers. This keeps the bus simple and avoids partial state.
+# ---------------------------------------------------------------------------
+
+_PAUSED_TRACES: set[str] = set()
+_CANCELLED_TRACES: set[str] = set()
+
+
+def is_paused(trace_id: str | None) -> bool:
+    return bool(trace_id) and trace_id in _PAUSED_TRACES
+
+
+def is_cancelled(trace_id: str | None) -> bool:
+    return bool(trace_id) and trace_id in _CANCELLED_TRACES
+
+
+def cancel_task(trace_id: str, reason: str = "user_cancel") -> bool:
+    """Mark a running trace as cancelled. Returns True if state changed.
+
+    DB first, in-memory second (consistent with complete_task/fail_task).
+    Subsequent agent events for this trace will be dropped at _safe_dispatch.
+    """
+    try:
+        _update_trace_status(trace_id, "cancelled", error=reason)
+    except Exception:
+        _log.exception("cancel_task: DB update failed for %s", trace_id)
+        return False
+    _CANCELLED_TRACES.add(trace_id)
+    _PAUSED_TRACES.discard(trace_id)
+    h = _HANDLES.pop(trace_id, None)
+    if h is not None and h._status == "running":
+        h._status = "cancelled"
+        h._error = RuntimeError(f"cancelled: {reason}")
+        h._event.set()
+    # Bound the lookaside so it doesn't grow unbounded over a long-lived daemon.
+    if len(_CANCELLED_TRACES) > 5000:
+        # Drop the oldest ~half (set order is insertion order for str on CPython 3.7+).
+        for old in list(_CANCELLED_TRACES)[:2500]:
+            _CANCELLED_TRACES.discard(old)
+    return True
+
+
+def pause_task(trace_id: str) -> bool:
+    """Pause a running trace. Agents will drop events with this trace_id
+    until resume_task() is called. Trace status flips to 'paused' in DB.
+    """
+    try:
+        _update_trace_status(trace_id, "paused")
+    except Exception:
+        _log.exception("pause_task: DB update failed for %s", trace_id)
+        return False
+    _PAUSED_TRACES.add(trace_id)
+    if len(_PAUSED_TRACES) > 5000:
+        for old in list(_PAUSED_TRACES)[:2500]:
+            _PAUSED_TRACES.discard(old)
+    return True
+
+
+def resume_task(trace_id: str) -> bool:
+    """Reverse pause_task — flip back to 'running'."""
+    try:
+        _update_trace_status(trace_id, "running", error=None)
+    except Exception:
+        _log.exception("resume_task: DB update failed for %s", trace_id)
+        return False
+    _PAUSED_TRACES.discard(trace_id)
+    return True
+
+
+def prune_orphan_handles() -> int:
+    """Drop in-memory handles whose DB trace is no longer 'running'.
+
+    Called periodically by the supervisor to prevent _HANDLES from growing
+    unbounded when a TASK_STARTED emit failed (handle registered, then bus
+    raised before downstream agents could resolve it) or when a parallel
+    process closed the trace in DB without notifying this process.
+    Returns the number of handles pruned.
+
+    G36 TOCTOU note (b5): The SELECT-then-pop pattern is **safe** because
+    trace status is monotonic (running → completed/failed/timeout never
+    reverses).  Handles registered between SELECT and pop are not in the
+    SELECT result set, so they are simply skipped this cycle and will be
+    considered next call.  No race can incorrectly prune an active handle.
+    """
+    if not _HANDLES:
+        return 0
+    try:
+        from wq_bus.data._sqlite import open_state
+        with open_state() as conn:
+            rows = conn.execute(
+                "SELECT trace_id, status FROM trace WHERE trace_id IN (%s)" %
+                ",".join("?" * len(_HANDLES)),
+                tuple(_HANDLES.keys()),
+            ).fetchall()
+    except Exception:
+        _log.exception("prune_orphan_handles: DB read failed")
+        return 0
+    pruned = 0
+    for r in rows:
+        if r["status"] not in ("running", None):
+            h = _HANDLES.pop(r["trace_id"], None)
+            if h is not None:
+                pruned += 1
+    return pruned
 
 
 # ---------------------------------------------------------------------------
@@ -239,15 +363,16 @@ def _update_trace_status(
     *,
     error: str | None = None,
 ) -> None:
-    try:
-        from wq_bus.data._sqlite import open_state
-        with open_state() as conn:
-            conn.execute(
-                "UPDATE trace SET status=?, ended_at=?, error=? WHERE trace_id=?",
-                (status, _utcnow_iso(), error, trace_id),
-            )
-    except Exception:
-        _log.exception("Failed to update trace status for %s", trace_id)
+    """Persist trace status. Re-raises on DB failure so callers can decide
+    whether to skip the in-memory handle resolution (otherwise the in-memory
+    state silently drifts from DB and the supervisor double-marks it timeout).
+    """
+    from wq_bus.data._sqlite import open_state
+    with open_state() as conn:
+        conn.execute(
+            "UPDATE trace SET status=?, ended_at=?, error=? WHERE trace_id=?",
+            (status, _utcnow_iso(), error, trace_id),
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -304,7 +429,9 @@ def start_task(
 
     _HANDLES[trace_id] = handle
 
-    # Emit TASK_STARTED — import lazily to avoid circular
+    # Emit TASK_STARTED — import lazily to avoid circular.
+    # If emit fails, evict the handle so _HANDLES doesn't leak (the trace row
+    # remains in DB but in-memory we have no observers).
     try:
         from wq_bus.bus.event_bus import get_bus
         from wq_bus.bus.events import TASK_STARTED, make_event
@@ -319,7 +446,12 @@ def start_task(
         )
         get_bus().emit(event)
     except Exception:
-        _log.exception("Failed to emit TASK_STARTED for %s", trace_id)
+        _log.exception("Failed to emit TASK_STARTED for %s — evicting handle", trace_id)
+        _HANDLES.pop(trace_id, None)
+        try:
+            _update_trace_status(trace_id, "failed", error="TASK_STARTED emit failed")
+        except Exception:
+            pass
 
     _log.info("task started trace_id=%s kind=%s origin=%s tag=%s", trace_id, kind, origin, tag)
     return handle

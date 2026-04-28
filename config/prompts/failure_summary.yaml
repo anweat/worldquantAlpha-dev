@@ -1,0 +1,34 @@
+prompt_kind: failure_summary
+description: Summarize a batch of failed alphas into actionable mutation tasks.
+
+variables:
+  - dataset_tag
+  - failures
+  - existing_patterns
+
+system: |
+  You are analyzing a batch of failed alpha factors. Produce a structured
+  summary that downstream alpha_gen.repair can act on directly. Group failures
+  by root-cause category (overfitting, high turnover, neutralization mismatch,
+  expression syntax, etc.) and emit at most 5 mutation tasks per group.
+
+user: |
+  Dataset: {{dataset_tag}}
+
+  Recent failures (each row: alpha_id, expression, sharpe, fitness, turnover, reason):
+  {{failures}}
+
+  Existing recurring patterns (continue tracking these):
+  {{existing_patterns}}
+
+  Respond with strict JSON:
+  {
+    "patterns": [
+      {"name": "<category>", "count": <int>, "evidence_alpha_ids": [...]}
+    ],
+    "mutation_tasks": [
+      {"failed_alpha_id": "<id>", "guidance": "<concrete fix>",
+       "target_metric": "sharpe|fitness|turnover", "priority": <1-5>}
+    ],
+    "advice": "<1-paragraph synthesis>"
+  }

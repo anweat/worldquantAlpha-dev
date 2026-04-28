@@ -1,0 +1,89 @@
+# data_analysis.yaml - 本地数据分析配置
+#
+# 控制本地Python数据分析功能
+
+datasets:
+  analysis_enabled: true
+  auto_update_stats: true              # 运行时自动更新统计数据
+  cache_results: true
+  cache_ttl_hours: 24
+
+analyzers:
+  dataset_characteristics:
+    enabled: true
+    priority: high
+    compute:
+      - coverage_stats                  # 数据覆盖度统计
+      - data_quality_metrics            # 数据质量指标
+      - temporal_coverage               # 时间覆盖范围
+      - sector_distribution             # 行业分布
+
+  factor_analysis:
+    enabled: true
+    priority: high
+    compute:
+      - correlation_matrix              # 因子相关性矩阵
+      - factor_exposure                 # 因子暴露度
+      - explained_variance              # 解释方差
+      - ic_analysis                     # 信息系数分析
+      - rank_correlation                # 排名相关性
+
+  failure_analysis:
+    enabled: true
+    priority: high
+    compute:
+      - fail_reason_distribution        # 失败原因分布
+      - category_fail_rates             # 类别失败率
+      - parameter_sensitivity           # 参数敏感性
+      - near_miss_patterns              # 近失败模式
+
+  self_correlation:
+    enabled: true
+    priority: high
+    compute:
+      - self_corr_matrix                # 自相关矩阵
+      - rolling_corr                    # 滚动相关性
+      - corr_decay_over_time            # 相关性随时间衰减
+      - factor_decay                   # 因子 decay 分析
+
+  distribution_stats:
+    enabled: true
+    priority: medium
+    compute:
+      - returns_distribution            # 收益分布
+      - weight_distribution             # 权重分布
+      - sector_distribution             # 行业分布
+      - concentration_metrics           # 集中度指标
+
+  time_series:
+    enabled: true
+    priority: medium
+    compute:
+      - returns_autocorrelation         # 收益自相关
+      - volatility_clustering          # 波动率聚类
+      - momentum_decay                 # 动量衰减
+      - mean_reversion                 # 均值回归
+      - regime_detection               # 状态检测
+
+output:
+  reports:
+    path: "results/reports/analysis"
+    format: markdown
+    include_json: true
+    auto_archive: true
+
+  charts:
+    enabled: false                     # 需要matplotlib等库
+    path: "results/charts"
+    formats: ["png"]
+
+  data_export:
+    path: "data/export"
+    format: csv
+    compress: true
+
+parameters:
+  correlation_threshold: 0.7           # 相关性阈值
+  ic_threshold: 0.02                   # IC显著性阈值
+  min_periods: 252                    # 最少数据周期
+  rolling_window: 60                  # 滚动窗口大小

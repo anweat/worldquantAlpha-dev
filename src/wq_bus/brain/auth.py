@@ -18,7 +18,7 @@ from typing import Optional
 
 import requests
 
-_PROJECT_ROOT = Path(__file__).resolve().parents[3]
+from wq_bus.utils.paths import PROJECT_ROOT as _PROJECT_ROOT  # noqa: E402
 _STATE_DIR = _PROJECT_ROOT / ".state"
 _CREDS_PATH = _STATE_DIR / "credentials.json"
 _SESSION_PATH = _STATE_DIR / "session.json"

@@ -25,7 +25,26 @@ if TYPE_CHECKING:
 _policy: "WatchdogPolicy | None" = None
 
 # Cooldown tracker for topic-based triggers: topic → last_emitted_ts
+# (also used for per-tag baseline counters keyed "TOPIC::baseline::{tag}")
 _topic_cooldown: dict[str, float] = {}
+# Soft cap to prevent unbounded growth across many dataset_tags / runs.
+_MAX_COOLDOWN_ENTRIES = 1000
+
+
+def _bound_topic_cooldown() -> None:
+    """Evict oldest entries when cooldown dict grows too large.
+
+    We sort by value (timestamp / counter) so the most recently active
+    keys survive — both the cooldown timestamps and per-tag baselines fit
+    this ordering since baselines are monotonically increasing.
+    """
+    if len(_topic_cooldown) <= _MAX_COOLDOWN_ENTRIES:
+        return
+    # Drop ~25% of the oldest entries
+    drop_n = len(_topic_cooldown) - int(_MAX_COOLDOWN_ENTRIES * 0.75)
+    items = sorted(_topic_cooldown.items(), key=lambda kv: kv[1])[:drop_n]
+    for k, _ in items:
+        _topic_cooldown.pop(k, None)
 
 
 def get_policy() -> "WatchdogPolicy":
@@ -134,6 +153,7 @@ def _check_topic_triggers(dataset_tag: str) -> list:
         except Exception:
             pass
 
+    _bound_topic_cooldown()
     return emitted
 
 

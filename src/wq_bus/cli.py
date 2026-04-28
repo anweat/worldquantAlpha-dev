@@ -83,7 +83,19 @@ def _build_brain_client():
 
 
 def _wire_agents(bus, dispatcher, brain_client):
-    """Instantiate and subscribe all agents."""
+    """Instantiate and subscribe all agents.
+
+    R6-C: ai_service + coordinator + summarizer are first-class long-running
+    services started here so the daemon owns their lifecycle. SummarizerAgent
+    runs its self-wake loop only inside the daemon (not for one-shot CLIs).
+
+    Idempotent: a second call on the same bus instance is a no-op (returns
+    the cached agents list). This protects against duplicate subscriptions
+    when the daemon's auto_resume path also calls _wire_agents.
+    """
+    cached = getattr(bus, "_wq_wired_agents", None)
+    if cached is not None:
+        return cached
     from wq_bus.agents.alpha_gen import AlphaGen
     from wq_bus.agents.sim_executor import SimExecutor
     from wq_bus.agents.self_corr_checker import SelfCorrChecker
@@ -91,7 +103,16 @@ def _wire_agents(bus, dispatcher, brain_client):
     from wq_bus.agents.submitter import Submitter
     from wq_bus.agents.portfolio_analyzer import PortfolioAnalyzer
     from wq_bus.agents.doc_summarizer import DocSummarizer
+    from wq_bus.agents.summarizer import SummarizerAgent
+    from wq_bus.ai.ai_service import AIService
+    from wq_bus.coordinator.runner import CoordinatorAgent
 
+    # AIService consumes AI_CALL_REQUESTED → renders prompt + calls dispatcher.
+    AIService(bus, dispatcher).start()
+    # Coordinator owns task lifecycle; subscribes to TASK_*_REQUESTED + trace events.
+    CoordinatorAgent(bus).start()
+
+    summarizer = SummarizerAgent(bus)                       # new R6-C 7-mode summarizer
     agents = [
         AlphaGen(bus, dispatcher),
         SimExecutor(bus, brain_client, dispatcher=dispatcher),
@@ -99,8 +120,25 @@ def _wire_agents(bus, dispatcher, brain_client):
         FailureAnalyzer(bus, dispatcher),
         Submitter(bus, brain_client),
         PortfolioAnalyzer(bus, brain_client),
-        DocSummarizer(bus, dispatcher),
+        DocSummarizer(bus, dispatcher),                      # legacy, not yet retired
+        summarizer,
     ]
+    # CrawlerAgent: subscribes to CRAWL_REQUESTED so daemon-side crawl chain
+    # works (per-source partial summary at trigger_threshold; workspace
+    # refinement at SummarizerAgent.workspace_overview min_new).
+    try:
+        from wq_bus.crawler.crawler_agent import CrawlerAgent
+        agents.append(CrawlerAgent(bus))
+    except ImportError as exc:
+        # crawler is optional (depends on httpx/playwright); log & continue.
+        import logging
+        logging.getLogger(__name__).warning(
+            "CrawlerAgent unavailable (%s) — CRAWL_REQUESTED will be unhandled", exc,
+        )
+    # SummarizerAgent's wake loop is started by the daemon explicitly; here we
+    # only attach its bus listeners (run_loop=False default).
+    summarizer.start(run_loop=False)
+    bus._wq_wired_agents = agents
     return agents
 
 
@@ -226,22 +264,34 @@ def crawl(ctx, target):
     asyncio.run(_go())
 
 
-@cli.command()
+@cli.command("summarize")
+@click.argument("mode")
+@click.option("--force", is_flag=True, default=True,
+              help="Ignore the per-mode min_new threshold (default true; CLI is manual).")
 @click.pass_context
-def summarize(ctx):
-    """Force doc_summarizer on pending docs."""
+def summarize(ctx, mode, force):
+    """Manually trigger one of the SummarizerAgent modes.
+
+    Modes: failure_summary | crawl_doc_summary | alpha_insight_extract |
+           workspace_overview | daily_summary | longterm_summary_7d |
+           diversity_analysis
+    """
     async def _go():
         from wq_bus.bus.event_bus import get_bus
-        from wq_bus.bus.events import Topic, make_event
+        from wq_bus.ai.ai_service import AIService
+        from wq_bus.agents.summarizer import SummarizerAgent
         bus = get_bus()
         dispatcher = _build_dispatcher(ctx.obj["model"], ctx.obj["depth"], ctx.obj["dry_run"])
-        from wq_bus.agents.doc_summarizer import DocSummarizer
-        DocSummarizer(bus, dispatcher)
-        with with_tag(ctx.obj["dataset"]):
-            # Fake a DOC_FETCHED to trigger threshold check
-            bus.emit(make_event(Topic.DOC_FETCHED, ctx.obj["dataset"],
-                                url_hash="manual", source="manual", title="manual"))
-            await bus.drain(timeout=300)
+        AIService(bus, dispatcher).start()
+        ag = SummarizerAgent(bus); ag.start(run_loop=False)
+        with with_tag(ctx.obj.get("dataset") or "_global"):
+            res = await ag.run_once(mode, force=force)
+        if res is None:
+            click.echo(f"[summarize] mode={mode}: no result (insufficient items or AI failed)")
+        else:
+            keys = list(res.keys()) if isinstance(res, dict) else type(res).__name__
+            cur = ag._cursors.get(mode) or {}
+            click.echo(f"[summarize] mode={mode} ok keys={keys} artifact={cur.get('last_artifact')}")
     asyncio.run(_go())
 
 
@@ -456,6 +506,8 @@ def emit_cmd(ctx, topic, json_payload, wait, timeout):
         wqbus emit CRAWL_REQUESTED --json '{"target":"arxiv_quant"}'
     """
     import json as _json
+    from wq_bus.data._sqlite import ensure_migrated
+    ensure_migrated()
     asyncio.run(_emit_main(ctx.obj, topic, _json.loads(json_payload), wait, timeout))
 
 
@@ -559,20 +611,30 @@ async def _resume_main(opts, max_events):
               help="Trigger auto-gen if no BATCH_DONE seen for this many seconds.")
 @click.option("--target-submitted", default=4, type=int,
               help="Stop auto-gen once today's submitted count reaches this.")
+@click.option("--with-web/--no-with-web", default=False,
+              help="Embed the HTTP console (web/server.py) in the daemon process so "
+                   "web-issued TASK_START_REQUESTED events reach the in-process bus.")
+@click.option("--web-host", default="127.0.0.1", show_default=True)
+@click.option("--web-port", type=int, default=8765, show_default=True)
 @click.pass_context
 def daemon_cmd(ctx, idle_secs, auto_resume, auto_gen, auto_gen_n,
-               auto_gen_idle_secs, target_submitted):
+               auto_gen_idle_secs, target_submitted,
+               with_web, web_host, web_port):
     """Run as a long-lived bus daemon: register agents, optionally resume,
     then idle and let the bus react to incoming events. Press Ctrl-C to stop.
 
     Compose with `wqbus emit ...` from another terminal to drive it.
+    With --with-web, also serve the web console on the same process so the
+    UI's "Start task" button reaches the in-process coordinator.
     """
     asyncio.run(_daemon_main(ctx.obj, idle_secs, auto_resume,
-                             auto_gen, auto_gen_n, auto_gen_idle_secs, target_submitted))
+                             auto_gen, auto_gen_n, auto_gen_idle_secs, target_submitted,
+                             with_web=with_web, web_host=web_host, web_port=web_port))
 
 
 async def _daemon_main(opts, idle_secs, auto_resume, auto_gen, auto_gen_n,
-                       auto_gen_idle_secs, target_submitted):
+                       auto_gen_idle_secs, target_submitted,
+                       with_web=False, web_host="127.0.0.1", web_port=8765):
     import signal
     import time as _time
     from wq_bus.bus.event_bus import get_bus
@@ -581,9 +643,44 @@ async def _daemon_main(opts, idle_secs, auto_resume, auto_gen, auto_gen_n,
     from wq_bus.data._sqlite import open_state, open_knowledge, ensure_migrated
     ensure_migrated()
     bus = get_bus()
+    # Bind this loop as the bus's main loop so cross-thread emits (e.g., from
+    # the embedded web server thread) are scheduled here safely.
+    try:
+        bus.bind_main_loop(asyncio.get_running_loop())
+    except RuntimeError:
+        pass
     dispatcher = _build_dispatcher(opts["model"], opts["depth"], opts["dry_run"])
     brain = _build_brain_client()
-    _wire_agents(bus, dispatcher, brain)
+    agents = _wire_agents(bus, dispatcher, brain)
+    # Upgrade SummarizerAgent to full wake-loop mode (daemon owns it).
+    try:
+        from wq_bus.agents.summarizer import SummarizerAgent as _SA
+        for ag in agents:
+            if isinstance(ag, _SA):
+                ag.start(run_loop=True)
+                break
+    except Exception:
+        click.echo("[daemon] summarizer wake loop start failed (non-fatal)", err=True)
+
+    web_thread = None
+    if with_web:
+        # Start web/server.serve in a background thread; it shares this process's
+        # in-memory bus, so /api/pipeline/start emits reach the coordinator.
+        # Start BEFORE resume() so the UI is reachable while resume drains events.
+        import sys as _sys, threading as _threading
+        from pathlib import Path as _P
+        _root = _P(__file__).resolve().parents[2]
+        if str(_root) not in _sys.path:
+            _sys.path.insert(0, str(_root))
+        from web.server import serve as _serve
+        def _run_web():
+            try:
+                _serve(web_host, web_port)
+            except Exception as e:
+                click.echo(f"[daemon] web server crashed: {e}", err=True)
+        web_thread = _threading.Thread(target=_run_web, name="wqbus-web", daemon=True)
+        web_thread.start()
+        click.echo(f"[daemon] web console at http://{web_host}:{web_port}/")
 
     if auto_resume:
         click.echo("[daemon] running resume() at startup...")
@@ -630,6 +727,17 @@ async def _daemon_main(opts, idle_secs, auto_resume, auto_gen, auto_gen_n,
             try:
                 await asyncio.wait_for(stop.wait(), timeout=idle_secs)
             except asyncio.TimeoutError:
+                # Cross-process pickup: tail unconsumed critical events emitted
+                # by short-lived CLI processes (agent-task, emit, etc.) that
+                # share state.db but not in-memory bus.
+                try:
+                    from wq_bus.bus.persistence import replay_unconsumed
+                    n = replay_unconsumed(bus, dataset_tag=opts["dataset"])
+                    if n:
+                        click.echo(f"[daemon] tailed {n} external event(s) from state.db")
+                except Exception as e:  # noqa: BLE001
+                    click.echo(f"[daemon] event tail error: {e}", err=True)
+
                 qp = state_db.queue_size("pending")
                 ai_today = state_db.count_ai_calls_today()
                 sub_today = _today_submitted_count()
@@ -925,6 +1033,8 @@ def admin_sweep_unsubmitted(ctx, limit):
 def drain_docs_cmd(ctx, max_batches, dataset_tag, output_json):
     """Manually drain pending docs through doc_summarizer (no auto-loop)."""
     import json as _json
+    from wq_bus.data._sqlite import ensure_migrated
+    ensure_migrated()
     tag = dataset_tag or ctx.obj.get("dataset") or _resolve_dataset(None)
     asyncio.run(_drain_docs_main(ctx.obj, tag, max_batches, output_json))
 
@@ -1102,7 +1212,159 @@ def _task_topic_for(agent: str, mode: str, *, url=None, goal=None,
     )
 
 
-@cli.command("task")
+# ---------- R6-C task pipelines (wqbus task <subcmd>) ----------
+@cli.group("task")
+def task_grp():
+    """Multi-agent goal-loop task pipelines (R6-C)."""
+    pass
+
+
+@task_grp.command("start")
+@click.argument("task_name")
+@click.option("--dataset", "dataset_tag", default=None)
+@click.option("--max-iter", "max_iter", type=int, default=None,
+              help="Override pipeline max_iterations.")
+@click.option("--wait", is_flag=True, help="Block until task finishes (or 30 min timeout).")
+@click.option("--json", "output_json", is_flag=True)
+@click.pass_context
+def task_start_cmd(ctx, task_name, dataset_tag, max_iter, wait, output_json):
+    """Start a pipeline task by name (see config/tasks.yaml)."""
+    import asyncio
+    import json as _json
+    from wq_bus.data._sqlite import ensure_migrated
+    ensure_migrated()
+    tag = dataset_tag or ctx.obj.get("dataset")
+    overrides = {}
+    if max_iter is not None:
+        overrides["max_iterations"] = max_iter
+
+    async def _go():
+        from wq_bus.bus.event_bus import get_bus
+        from wq_bus.coordinator.runner import CoordinatorAgent
+        from wq_bus.ai.ai_service import AIService
+        from wq_bus.data import task_db as _tdb
+
+        bus = get_bus()
+        dispatcher = _build_dispatcher(ctx.obj["model"], ctx.obj["depth"], ctx.obj["dry_run"])
+        brain = _build_brain_client()
+        # Wire the full agent set so the pipeline has real handlers.
+        _wire_agents(bus, dispatcher, brain)
+        coord = CoordinatorAgent(bus); coord.start()
+        # AIService is also started inside _wire_agents; calling start() again
+        # is idempotent (subscribe is checked) so this is safe.
+        AIService(bus, dispatcher).start()
+        try:
+            task_id = await coord.start_task(
+                task_name, dataset_tag=tag, origin="cli", overrides=overrides,
+            )
+        except ValueError as e:
+            click.echo(f"ERROR: {e}", err=True)
+            raise SystemExit(2)
+
+        if output_json:
+            click.echo(_json.dumps({"task_id": task_id, "task": task_name}))
+        else:
+            click.echo(f"task started: {task_id}  (pipeline={task_name}, dataset={tag})")
+        if wait:
+            t0 = __import__("time").time()
+            while __import__("time").time() - t0 < 1800:
+                row = _tdb.get_task(task_id)
+                st = (row or {}).get("status")
+                if st in ("satisfied", "exhausted", "cancelled", "failed"):
+                    click.echo(f"task done status={st} iters={row.get('iterations')}")
+                    return
+                await asyncio.sleep(2.0)
+            click.echo("task wait timeout (30 min); use 'wqbus task show' to inspect.")
+    asyncio.run(_go())
+
+
+@task_grp.command("list")
+@click.option("--status", default=None, help="Filter by status.")
+@click.option("--limit", type=int, default=20)
+@click.option("--json", "output_json", is_flag=True)
+def task_list_cmd(status, limit, output_json):
+    """List recent tasks."""
+    from wq_bus.data._sqlite import ensure_migrated
+    from wq_bus.data import task_db
+    ensure_migrated()
+    rows = task_db.list_tasks(status=status, limit=limit)
+    if output_json:
+        import json as _json
+        click.echo(_json.dumps(rows, default=str))
+        return
+    if not rows:
+        click.echo("(no tasks)"); return
+    click.echo(f"{'task_id':<22} {'name':<22} {'status':<11} {'iters':>5}  pipeline")
+    for r in rows:
+        click.echo(f"{r['task_id']:<22} {r['name']:<22} {r['status']:<11} "
+                   f"{r.get('iterations',0):>5}  {r.get('pipeline','')}")
+
+
+@task_grp.command("show")
+@click.argument("task_id")
+@click.option("--json", "output_json", is_flag=True)
+def task_show_cmd(task_id, output_json):
+    """Show a task's full record + iterations."""
+    from wq_bus.data._sqlite import ensure_migrated
+    from wq_bus.data import task_db
+    ensure_migrated()
+    row = task_db.get_task(task_id)
+    if not row:
+        click.echo(f"(no such task: {task_id})", err=True); raise SystemExit(2)
+    states = task_db.list_pipeline_states_for_task(task_id)
+    out = {"task": row, "iterations": states}
+    if output_json:
+        import json as _json
+        click.echo(_json.dumps(out, default=str, indent=2))
+        return
+    click.echo(f"task={row['task_id']} name={row['name']} status={row['status']} "
+               f"iters={row.get('iterations',0)}/{row.get('max_iterations','?')}")
+    click.echo(f"  goal={row.get('goal','')}")
+    click.echo(f"  progress={row.get('progress_json','{}')}")
+    if states:
+        click.echo("iterations:")
+        for s in states:
+            click.echo(f"  iter={s['iteration']} trace={s['trace_id']} "
+                       f"step={s.get('current_step')} status={s.get('status')}")
+
+
+def _emit_task_control(topic_name: str, task_id: str) -> None:
+    from wq_bus.bus.event_bus import get_bus
+    from wq_bus.bus.events import make_event
+    from wq_bus.data._sqlite import ensure_migrated
+    from wq_bus.data import task_db
+    ensure_migrated()
+    row = task_db.get_task(task_id)
+    if not row:
+        click.echo(f"(no such task: {task_id})", err=True); raise SystemExit(2)
+    bus = get_bus()
+    bus.emit(make_event(topic_name, row.get("dataset_tag") or "_global",
+                        task_id=task_id))
+    click.echo(f"emitted {topic_name} for task={task_id}")
+
+
+@task_grp.command("pause")
+@click.argument("task_id")
+def task_pause_cmd(task_id):
+    """Pause a running task (skips next iteration spawn until resumed)."""
+    _emit_task_control("TASK_PAUSE_REQUESTED", task_id)
+
+
+@task_grp.command("resume")
+@click.argument("task_id")
+def task_resume_cmd(task_id):
+    """Resume a paused task."""
+    _emit_task_control("TASK_RESUME_REQUESTED", task_id)
+
+
+@task_grp.command("cancel")
+@click.argument("task_id")
+def task_cancel_cmd(task_id):
+    """Cancel a task (stops at the next safe point)."""
+    _emit_task_control("TASK_CANCEL_REQUESTED", task_id)
+
+
+@cli.command("agent-task")
 @click.argument("agent")
 @click.option("--mode", "-m", default="explore", help="Agent mode (alpha_gen: explore|specialize|review_failure|track_news).")
 @click.option("--dataset", "dataset_tag", default=None, help="Dataset tag.")
@@ -1113,7 +1375,9 @@ def _task_topic_for(agent: str, mode: str, *, url=None, goal=None,
 @click.option("--json", "output_json", is_flag=True, help="Output trace_id as JSON.")
 @click.pass_context
 def task_cmd(ctx, agent, mode, dataset_tag, url, goal, summarize, n, output_json):
-    """Dispatch a manual task to an agent.
+    """Dispatch a one-shot trigger to a single agent (legacy single-agent path).
+
+    For multi-agent goal-loop pipelines use ``wqbus task start <task_name>`` instead.
 
     Internally:
         1. Resolves agent → trigger topic + payload.
@@ -1163,55 +1427,54 @@ def task_cmd(ctx, agent, mode, dataset_tag, url, goal, summarize, n, output_json
                             payload={"agent": agent, "mode": mode, **base_payload},
                             origin="manual_cli", dataset_tag=tag)
 
-        # For agents that need a direct method call (no bus topic exists),
-        # do it inline so manual triggers still work.
-        if topic == "__direct_analyze_now__":
-            try:
-                from wq_bus.brain.client import BrainClient
-                from wq_bus.agents.portfolio_analyzer import PortfolioAnalyzer
-                from wq_bus.bus.tasks import complete_task, fail_task
-                bus = get_bus()
-                pa = PortfolioAnalyzer(bus, BrainClient())
-                with with_trace(handle.trace_id):
-                    asyncio.run(pa.analyze_now(tag))
-                complete_task(handle.trace_id, {"agent": "portfolio_analyzer"})
-            except Exception as e:
-                from wq_bus.bus.tasks import fail_task
-                fail_task(handle.trace_id, e)
-                click.echo(f"ERROR: portfolio_analyzer.analyze_now failed: {e}", err=True)
-                sys.exit(1)
-        elif topic == "__direct_health_probe__":
-            try:
-                from wq_bus.brain.client import BrainClient
-                from wq_bus.agents.api_healthcheck import ApiHealthCheck
-                from wq_bus.bus.tasks import complete_task
-                bus = get_bus()
-                hc = ApiHealthCheck(bus, BrainClient(), dataset_tag=tag,
-                                    probe_kind=base_payload.get("kind", "auth"))
-                with with_trace(handle.trace_id):
-                    res = asyncio.run(hc.probe_once())
-                click.echo(_json.dumps(res))
-                complete_task(handle.trace_id, {"agent": "api_healthcheck", "result": res})
-            except Exception as e:
-                from wq_bus.bus.tasks import fail_task
-                fail_task(handle.trace_id, e)
-                click.echo(f"ERROR: api_healthcheck probe failed: {e}", err=True)
-                sys.exit(1)
-        else:
-            # Instantiate the agent(s) so the trigger event has a handler.
-            # Without this, emit() would find 0 handlers and the deferred
-            # auto-close would still close the trace immediately.
-            bus = get_bus()
-            _instantiated = _instantiate_agents_for(agent, bus)
-            ev = make_event(topic, tag, trace_id=handle.trace_id, **base_payload)
-            with with_trace(handle.trace_id):
-                async def _emit_and_drain():
+        # All async work goes through a single asyncio.run() with the
+        # contextvar (with_trace) set INSIDE the coroutine. This ensures
+        # the trace_id is bound to the asyncio Task context (not just the
+        # caller-thread snapshot), so any spawned tasks inherit it cleanly.
+        async def _run_async():
+            from wq_bus.utils.tag_context import with_trace as _with_trace
+            with _with_trace(handle.trace_id):
+                if topic == "__direct_analyze_now__":
+                    from wq_bus.brain.client import BrainClient
+                    from wq_bus.agents.portfolio_analyzer import PortfolioAnalyzer
+                    bus = get_bus()
+                    pa = PortfolioAnalyzer(bus, BrainClient())
+                    await pa.analyze_now(tag)
+                    return {"agent": "portfolio_analyzer"}
+                elif topic == "__direct_health_probe__":
+                    from wq_bus.brain.client import BrainClient
+                    from wq_bus.agents.api_healthcheck import ApiHealthCheck
+                    bus = get_bus()
+                    hc = ApiHealthCheck(bus, BrainClient(), dataset_tag=tag,
+                                        probe_kind=base_payload.get("kind", "auth"))
+                    res = await hc.probe_once()
+                    return {"agent": "api_healthcheck", "result": res}
+                else:
+                    bus = get_bus()
+                    _instantiate_agents_for(agent, bus)
+                    ev = make_event(topic, tag, trace_id=handle.trace_id, **base_payload)
                     bus.emit(ev)
                     try:
                         await bus.drain(timeout=180)
                     except Exception as e:
                         click.echo(f"warn: drain failed: {e}", err=True)
-                asyncio.run(_emit_and_drain())
+                    return None
+
+        try:
+            result = asyncio.run(_run_async())
+        except Exception as e:
+            from wq_bus.bus.tasks import fail_task
+            fail_task(handle.trace_id, e)
+            click.echo(f"ERROR: task {agent} failed: {e}", err=True)
+            sys.exit(1)
+
+        # Direct-call paths complete the trace explicitly; bus-driven paths
+        # let the auto-close machinery (event_bus._maybe_close_trace) finish it.
+        if topic in ("__direct_analyze_now__", "__direct_health_probe__"):
+            from wq_bus.bus.tasks import complete_task
+            complete_task(handle.trace_id, result)
+            if topic == "__direct_health_probe__" and result:
+                click.echo(_json.dumps(result.get("result")))
 
     if output_json:
         click.echo(_json.dumps({"trace_id": handle.trace_id, "agent": agent,
@@ -1566,8 +1829,117 @@ def db_migrate_cmd(output_json):
         sys.exit(1)
 
 
+@cli.group("kb")
+def kb_grp():
+    """Knowledge-base maintenance (G8 retention pruning, lineage queries)."""
+
+
+@kb_grp.command("prune")
+@click.option("--dataset", "dataset_tag", default=None,
+              help="Dataset tag (defaults to user.yaml.default_dataset).")
+@click.option("--alpha-days", default=180, type=int, show_default=True)
+@click.option("--fingerprint-days", default=90, type=int, show_default=True)
+@click.option("--pnl-days", default=180, type=int, show_default=True)
+@click.option("--learning-days", default=365, type=int, show_default=True)
+@click.option("--crawl-doc-days", default=90, type=int, show_default=True)
+@click.option("--keep-top-sharpe", default=200, type=int, show_default=True,
+              help="Always retain the top-N alphas by sharpe regardless of age.")
+@click.option("--json", "output_json", is_flag=True)
+@click.pass_context
+def kb_prune_cmd(ctx, dataset_tag, alpha_days, fingerprint_days, pnl_days,
+                 learning_days, crawl_doc_days, keep_top_sharpe, output_json):
+    """G8: Prune old KB rows for a dataset_tag (alphas/fingerprints/pnl/etc)."""
+    import json as _json
+    from wq_bus.data._sqlite import ensure_migrated
+    from wq_bus.data import knowledge_db
+    ensure_migrated()
+    tag = dataset_tag or ctx.obj.get("dataset")
+    if not tag:
+        try:
+            from wq_bus.utils.yaml_loader import load_yaml
+            tag = (load_yaml("user") or {}).get("default_dataset")
+        except Exception:
+            pass
+    if not tag:
+        click.echo("ERROR: --dataset TAG required", err=True)
+        sys.exit(2)
+    with with_tag(tag):
+        counts = knowledge_db.prune_old(
+            alpha_days=alpha_days, fingerprint_days=fingerprint_days,
+            pnl_days=pnl_days, learning_days=learning_days,
+            crawl_doc_days=crawl_doc_days, keep_top_sharpe=keep_top_sharpe,
+        )
+    if output_json:
+        click.echo(_json.dumps({"dataset_tag": tag, "deleted": counts}, indent=2))
+    else:
+        total = sum(counts.values())
+        click.echo(f"kb prune {tag}: total deleted={total}")
+        for k, v in counts.items():
+            click.echo(f"  {k:<22s} {v}")
+
+
 def main():
     cli(obj={})
+
+
+# ---------------------------------------------------------------------------
+# manifest: build docs/manifest.generated.yaml
+# ---------------------------------------------------------------------------
+
+@cli.group("manifest")
+def manifest_grp():
+    """Doc manifest for AI sub-agents (per-mode/per-tag file index)."""
+
+
+@manifest_grp.command("build")
+@click.option("--dry-run", is_flag=True, help="Print summary, do not write file.")
+def manifest_build_cmd(dry_run):
+    """Scan docs/ + memory/ and refresh docs/manifest.generated.yaml."""
+    import importlib.util as _ilu
+    from pathlib import Path as _P
+    spec = _ilu.spec_from_file_location(
+        "manifest_builder",
+        _P(__file__).resolve().parents[2] / "scripts" / "manifest_builder.py",
+    )
+    mod = _ilu.module_from_spec(spec)
+    spec.loader.exec_module(mod)  # type: ignore[union-attr]
+    out = mod.build(write=not dry_run)
+    n = len(out["entries"])
+    where = "(dry-run)" if dry_run else "→ docs/manifest.generated.yaml"
+    click.echo(f"manifest: {n} entries {where}")
+
+
+@manifest_grp.command("show")
+@click.option("--mode", default="explore", show_default=True,
+              help="Filter to entries applicable to this alpha_gen mode.")
+@click.option("--tag", default=None, help="Resolve per-tag entries against this dataset.")
+def manifest_show_cmd(mode, tag):
+    """Show what alpha_gen would inject into the prompt for a given mode."""
+    from wq_bus.ai.doc_manifest import load_for_mode, render_for_prompt, reload as _r
+    _r()
+    entries = load_for_mode(mode, dataset_tag=tag)
+    click.echo(f"# {len(entries)} entries for mode={mode} tag={tag}")
+    click.echo(render_for_prompt(entries))
+
+
+# ---------------------------------------------------------------------------
+# web: minimal stdlib console (R6-B)
+# ---------------------------------------------------------------------------
+
+@cli.command("web")
+@click.option("--host", default="127.0.0.1", show_default=True,
+              help="Bind address (use 0.0.0.0 only behind a reverse proxy you trust)")
+@click.option("--port", type=int, default=8765, show_default=True)
+def web_cmd(host, port):
+    """Launch the minimal HTML console (no auth, localhost-only by default)."""
+    # Lazy import so plain `wqbus --help` doesn't pull in http.server.
+    import sys as _sys
+    from pathlib import Path as _P
+    _root = _P(__file__).resolve().parents[2]
+    if str(_root) not in _sys.path:
+        _sys.path.insert(0, str(_root))
+    from web.server import serve
+    serve(host, port)
 
 
 # ---------------------------------------------------------------------------
@@ -1721,6 +2093,8 @@ def queue_list(status: str, dataset_tag: str | None):
     from wq_bus.utils.tag_context import with_tag
     from wq_bus.utils.yaml_loader import load_yaml
     from wq_bus.data import state_db
+    from wq_bus.data._sqlite import ensure_migrated
+    ensure_migrated()
     tag = dataset_tag or (load_yaml("datasets") or {}).get("default_tag", "_global")
     with with_tag(tag):
         rows = state_db.list_queue_by_status(status)
@@ -1749,6 +2123,8 @@ def queue_requeue(alpha_id: str | None, all_deadletter: bool,
     from wq_bus.utils.tag_context import with_tag
     from wq_bus.utils.yaml_loader import load_yaml
     from wq_bus.data import state_db
+    from wq_bus.data._sqlite import ensure_migrated
+    ensure_migrated()
     tag = dataset_tag or (load_yaml("datasets") or {}).get("default_tag", "_global")
     if not alpha_id and not all_deadletter:
         click.echo("error: provide ALPHA_ID or --all-deadletter", err=True)
@@ -1764,6 +2140,122 @@ def queue_requeue(alpha_id: str | None, all_deadletter: bool,
         else:
             ok = state_db.requeue_alpha(alpha_id, reset_retry=reset_retry)  # type: ignore[arg-type]
             click.echo(f"{'requeued' if ok else 'NOT FOUND'}: {alpha_id} (reset_retry={reset_retry})")
+
+
+# ---------------------------------------------------------------------------
+# sim-dlq: Round-5 c2 — simulation-stage dead letter queue
+# ---------------------------------------------------------------------------
+
+@cli.group("sim-dlq")
+def sim_dlq_grp():
+    """Inspect / requeue simulation dead-letter entries (sim_executor)."""
+
+
+@sim_dlq_grp.command("list")
+@click.option("--dataset", "dataset_tag", default=None, help="Override dataset tag.")
+@click.option("--limit", default=50, type=int, show_default=True)
+def sim_dlq_list_cmd(dataset_tag: str | None, limit: int):
+    from wq_bus.utils.yaml_loader import load_yaml
+    from wq_bus.data import state_db
+    from wq_bus.data._sqlite import ensure_migrated
+    ensure_migrated()
+    tag = dataset_tag or (load_yaml("datasets") or {}).get("default_tag", "_global")
+    with with_tag(tag):
+        rows = state_db.list_sim_dead_letter(limit=limit)
+    click.echo(f"=== sim_dead_letter (tag={tag}, n={len(rows)}) ===")
+    for r in rows:
+        click.echo(f"  #{r['id']:>4} attempts={r.get('attempts',1)} "
+                   f"created={r.get('created_at',0):.0f} "
+                   f"reason={(r.get('reason') or '')[:60]}")
+        click.echo(f"        expr={(r.get('expression') or '')[:120]}")
+
+
+@sim_dlq_grp.command("requeue")
+@click.argument("row_id", type=int)
+@click.option("--dataset", "dataset_tag", default=None)
+def sim_dlq_requeue_cmd(row_id: int, dataset_tag: str | None):
+    """Mark a sim DLQ entry as requeued and re-emit GENERATE_REQUESTED for its expression.
+
+    Note: only marks the row; you must run alpha_gen / dispatcher to re-process.
+    For an explicit re-simulation, use `wqbus emit ALPHA_DRAFTED ...` with the
+    expression payload from `sim-dlq list`.
+    """
+    from wq_bus.utils.yaml_loader import load_yaml
+    from wq_bus.data import state_db
+    from wq_bus.data._sqlite import ensure_migrated
+    ensure_migrated()
+    tag = dataset_tag or (load_yaml("datasets") or {}).get("default_tag", "_global")
+    with with_tag(tag):
+        ok = state_db.mark_sim_dlq_requeued(row_id)
+    click.echo(f"{'requeued' if ok else 'NOT FOUND'}: sim_dlq #{row_id}")
+
+
+# ---------------------------------------------------------------------------
+# alpha lineage: Round-5 d2/C4 — cross-table join (no SQLite VIEW since
+# alphas live in knowledge.db while traces/ai_calls/queue live in state.db).
+# ---------------------------------------------------------------------------
+
+@cli.group("alpha")
+def alpha_grp():
+    """Alpha-centric queries (lineage, history)."""
+
+
+@alpha_grp.command("lineage")
+@click.argument("alpha_id")
+@click.option("--json", "output_json", is_flag=True)
+def alpha_lineage_cmd(alpha_id: str, output_json: bool):
+    """Show end-to-end lineage for an alpha: trace → ai_call → alpha → submission_queue."""
+    import json as _json
+    from wq_bus.data._sqlite import ensure_migrated, open_state, open_knowledge
+    ensure_migrated()
+    out: dict = {"alpha_id": alpha_id}
+    with open_knowledge() as kc:
+        row = kc.execute(
+            "SELECT alpha_id, dataset_tag, status, sharpe, fitness, turnover, "
+            "trace_id, ai_call_id, direction_id, themes_csv "
+            "FROM alphas WHERE alpha_id=?",
+            (alpha_id,),
+        ).fetchone()
+    if not row:
+        click.echo(f"alpha not found: {alpha_id}", err=True)
+        sys.exit(1)
+    out["alpha"] = dict(row)
+    trace_id = out["alpha"].get("trace_id")
+    ai_call_id = out["alpha"].get("ai_call_id")
+    with open_state() as sc:
+        if trace_id:
+            tr = sc.execute(
+                "SELECT trace_id, origin, parent_trace_id, task_kind, status, "
+                "started_at, ended_at, error FROM trace WHERE trace_id=?",
+                (trace_id,),
+            ).fetchone()
+            out["trace"] = dict(tr) if tr else None
+        if ai_call_id:
+            ac = sc.execute(
+                "SELECT id, ts, agent_type, model, provider, success, "
+                "tokens_in, tokens_out, cost_usd, duration_ms, source "
+                "FROM ai_calls WHERE id=?",
+                (ai_call_id,),
+            ).fetchone()
+            out["ai_call"] = dict(ac) if ac else None
+        sq = sc.execute(
+            "SELECT alpha_id, status, retry_count, last_error, updated_at, note "
+            "FROM submission_queue WHERE alpha_id=?",
+            (alpha_id,),
+        ).fetchone()
+        out["submission_queue"] = dict(sq) if sq else None
+    if output_json:
+        click.echo(_json.dumps(out, indent=2, default=str))
+    else:
+        click.echo(f"=== Alpha lineage: {alpha_id} ===")
+        for section in ("alpha", "trace", "ai_call", "submission_queue"):
+            click.echo(f"\n[{section}]")
+            sec = out.get(section)
+            if not sec:
+                click.echo("  (none)")
+                continue
+            for k, v in sec.items():
+                click.echo(f"  {k:<18s} {v}")
 
 
 if __name__ == "__main__":

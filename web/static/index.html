@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <base href="__BASE__" />
+  <title>wqbus console</title>
+  <link rel="stylesheet" href="static/style.css" />
+</head>
+<body>
+  <header>
+    <strong>wqbus</strong>
+    <span id="state-pill" class="pill">…</span>
+    <nav>
+      <a href="#" data-tab="pipe" class="active">Pipelines</a>
+      <a href="#" data-tab="trace">Traces</a>
+      <a href="#" data-tab="agent">Agents</a>
+      <a href="#" data-tab="sumr">Summarizer</a>
+      <a href="#" data-tab="log">Logs</a>
+      <a href="#" data-tab="cfg">Config</a>
+      <a href="#" data-tab="kb">KB</a>
+    </nav>
+  </header>
+
+  <main>
+    <!-- ============= PIPELINES (R6-C tasks) ============= -->
+    <section id="pipe" class="tab active">
+      <h2>Start a pipeline task</h2>
+      <form id="pipe-form" class="grid">
+        <label>task <select id="pipe-name" name="task_name"></select></label>
+        <label>dataset_tag <input name="dataset_tag" value="_global" /></label>
+        <label>max_iterations <input name="max_iterations" type="number" placeholder="(yaml default)" /></label>
+        <label class="full"><span id="pipe-desc" class="muted"></span></label>
+        <button>start task</button>
+      </form>
+
+      <h2>Tasks</h2>
+      <div class="row">
+        <button id="pipe-refresh">refresh</button>
+        <label>status
+          <select id="pipe-filter">
+            <option value="">(all)</option>
+            <option>running</option><option>satisfied</option>
+            <option>exhausted</option><option>cancelled</option>
+            <option>aborted</option><option>paused</option>
+          </select>
+        </label>
+        <span class="muted">click a task_id for iterations</span>
+      </div>
+      <table id="pipe-tbl"><thead><tr>
+        <th>task_id</th><th>name</th><th>tag</th><th>status</th>
+        <th>iters</th><th>started</th><th>ended</th><th>actions</th>
+      </tr></thead><tbody></tbody></table>
+
+      <div id="pipe-detail" hidden>
+        <h3>Task <code id="pd-id"></code> <span id="pd-name" class="muted"></span></h3>
+        <div id="pd-meta" class="kvgrid"></div>
+        <h4>Iterations</h4>
+        <table id="pd-iters"><thead><tr>
+          <th>iter</th><th>trace_id</th><th>pipeline</th><th>step</th>
+          <th>status</th><th>started</th><th>ended</th>
+        </tr></thead><tbody></tbody></table>
+      </div>
+    </section>
+
+    <!-- ============= TRACES ============= -->
+    <section id="trace" class="tab">
+      <h2>Recent traces</h2>
+      <div class="row">
+        <button id="trace-refresh">refresh</button>
+        <label>limit <input id="trace-limit" type="number" value="50" min="1" max="500" /></label>
+        <span class="muted">click a trace_id for the event log</span>
+      </div>
+      <table id="trace-tbl"><thead><tr>
+        <th>trace_id</th><th>kind</th><th>status</th><th>tag</th>
+        <th>parent_task</th><th>started</th><th>ended</th><th>actions</th>
+      </tr></thead><tbody></tbody></table>
+
+      <div id="trace-detail" hidden>
+        <h3>Trace <code id="td-id"></code></h3>
+        <pre id="td-body"></pre>
+      </div>
+    </section>
+
+    <!-- ============= AGENTS (legacy single-shot) ============= -->
+    <section id="agent" class="tab">
+      <h2>Single agent task <span class="muted">(legacy / debug)</span></h2>
+      <p class="muted">Bypasses the coordinator — emits a single trigger event for one agent.
+      Prefer Pipelines for goal-driven multi-iteration work.</p>
+      <form id="agent-form" class="grid">
+        <label>agent <select name="agent">
+          <option>alpha_gen</option><option>failure_analyzer</option>
+          <option>portfolio_analyzer</option><option>api_healthcheck</option>
+          <option>crawler</option><option>submitter</option>
+        </select></label>
+        <label>mode <input name="mode" value="explore" /></label>
+        <label>dataset_tag <input name="dataset_tag" value="_global" /></label>
+        <label>n <input name="n" type="number" value="3" /></label>
+        <label>goal <input name="goal" placeholder="(optional)" /></label>
+        <label>url <input name="url" placeholder="(crawler only)" /></label>
+        <button>start agent task</button>
+      </form>
+    </section>
+
+    <!-- ============= SUMMARIZER ============= -->
+    <section id="sumr" class="tab">
+      <h2>Summarizer modes</h2>
+      <p class="muted">Manual one-shot run (force=true). Output is written to
+        <code>memory/&lt;tag&gt;/summaries/&lt;mode&gt;.md</code>.</p>
+      <div class="row"><button id="sumr-refresh">refresh modes</button></div>
+      <table id="sumr-tbl"><thead><tr>
+        <th>mode</th><th>enabled</th><th>source</th><th>prompt_kind</th>
+        <th>wake_interval</th><th>action</th>
+      </tr></thead><tbody></tbody></table>
+      <h3>Result</h3>
+      <pre id="sumr-out" class="logbox"></pre>
+    </section>
+
+    <!-- ============= LOGS ============= -->
+    <section id="log" class="tab">
+      <h2>Logs</h2>
+      <div class="row">
+        <label>tag <input id="log-tag" value="" placeholder="_global if empty" /></label>
+        <label>lines <input id="log-lines" type="number" value="200" /></label>
+        <button id="log-tail-btn">tail</button>
+        <button id="log-stream-btn">stream (SSE)</button>
+        <button id="log-stop-btn">stop</button>
+        <button id="log-clear-btn">clear</button>
+      </div>
+      <pre id="log-out" class="logbox"></pre>
+    </section>
+
+    <!-- ============= CONFIG ============= -->
+    <section id="cfg" class="tab">
+      <h2>config/*.yaml</h2>
+      <div class="row">
+        <select id="cfg-list"></select>
+        <button id="cfg-load">load</button>
+        <button id="cfg-save">save (creates .bak)</button>
+        <span id="cfg-status" class="muted"></span>
+      </div>
+      <textarea id="cfg-edit" rows="22" spellcheck="false"></textarea>
+    </section>
+
+    <!-- ============= KB ============= -->
+    <section id="kb" class="tab">
+      <h2>Knowledge base query</h2>
+      <div class="row">
+        <select id="kb-quick">
+          <option value="">— quick query —</option>
+          <option>alphas_recent</option>
+          <option>alphas_passed</option>
+          <option>fingerprints_recent</option>
+          <option>learnings_recent</option>
+          <option>submission_queue</option>
+          <option>sim_dlq</option>
+        </select>
+        <button id="kb-run-quick">run quick</button>
+      </div>
+      <textarea id="kb-sql" rows="4" placeholder="SELECT ... (read-only; LIMIT enforced)"></textarea>
+      <div class="row">
+        <button id="kb-run">run SQL</button>
+        <span id="kb-status" class="muted"></span>
+      </div>
+      <div id="kb-out"></div>
+    </section>
+  </main>
+
+  <script src="static/app.js"></script>
+</body>
+</html>

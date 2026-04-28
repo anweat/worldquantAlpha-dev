@@ -1,0 +1,133 @@
+# Handwritten doc manifest — metadata for AI sub-agents.
+#
+# The script scripts/manifest_builder.py merges this with auto-scanned
+# entries from docs/ + memory/<tag>/ to produce docs/manifest.generated.yaml.
+# alpha_gen (and other agents) inject filtered entries into prompts so
+# Copilot CLI sub-agents can `view <path>` on demand instead of receiving
+# every doc inline.
+#
+# Schema per entry:
+#   path:               relative to repo root (forward slashes)
+#   title:              short human label (≤80 chars)
+#   applies_to_modes:   list of alpha_gen modes; "*" = all
+#   tags:               free-form (e.g. operators, fundamentals, recipes)
+#   scope:              global | per_tag    (per_tag means resolve {tag})
+#   priority:           1 (must-read) … 5 (deep dive); used for prompt ordering
+#
+# Anything found by the scanner but not listed here is included with
+# auto-detected priority=4 and tags inferred from path.
+
+entries:
+  # ── Core BRAIN reference ──────────────────────────────────────────────
+  - path: docs/03_运算符完整参考手册.md
+    title: FE operator reference (66 ops, signatures, pitfalls)
+    applies_to_modes: ["*"]
+    tags: [operators, reference]
+    scope: global
+    priority: 1
+
+  - path: docs/05_性能指标与提交标准.md
+    title: IS metrics + submission gates (sharpe/fitness/turnover)
+    applies_to_modes: ["*"]
+    tags: [metrics, submission]
+    scope: global
+    priority: 1
+
+  - path: docs/02_Fast_Expression_语言指南.md
+    title: FE language guide — syntax, types, common patterns
+    applies_to_modes: ["explore", "specialize", "review_failure"]
+    tags: [language, syntax]
+    scope: global
+    priority: 2
+
+  - path: docs/06_数据字段与数据集.md
+    title: Datasets & field families (fundamentals, prices, analyst)
+    applies_to_modes: ["explore", "specialize", "track_news"]
+    tags: [fields, datasets]
+    scope: global
+    priority: 2
+
+  - path: docs/07_Alpha开发实战指南.md
+    title: Practical alpha dev playbook (recipes, examples)
+    applies_to_modes: ["explore", "specialize"]
+    tags: [recipes, examples]
+    scope: global
+    priority: 3
+
+  - path: docs/11_进阶Alpha知识与策略.md
+    title: Advanced alpha strategies (sector, neutralization)
+    applies_to_modes: ["specialize"]
+    tags: [advanced, strategies]
+    scope: global
+    priority: 3
+
+  - path: docs/12_community_insights_and_alpha_experience.md
+    title: Community wisdom + experience notes
+    applies_to_modes: ["explore", "track_news"]
+    tags: [community, experience]
+    scope: global
+    priority: 4
+
+  - path: docs/13_alpha_defects_and_community_wisdom.md
+    title: Common alpha defects to avoid
+    applies_to_modes: ["review_failure", "explore"]
+    tags: [pitfalls, defects]
+    scope: global
+    priority: 3
+
+  - path: docs/architecture/COMPOSITION_RECIPES.md
+    title: Recipe composition patterns (signal × filter × weight)
+    applies_to_modes: ["*"]
+    tags: [recipes, composition]
+    scope: global
+    priority: 2
+
+  # ── Per-workspace runtime memory (resolved per dataset_tag) ───────────
+  - path: memory/{tag}/dataset_insights.md
+    title: Workspace insights — field discovery, pass rates per family
+    applies_to_modes: ["*"]
+    tags: [insights, runtime]
+    scope: per_tag
+    priority: 1
+
+  - path: memory/{tag}/next_session_context.md
+    title: Last-session recap — top alphas, queue state, recommendations
+    applies_to_modes: ["*"]
+    tags: [recap, runtime]
+    scope: per_tag
+    priority: 1
+
+  - path: memory/{tag}/insights.md
+    title: Aggregate insights (combined sources)
+    applies_to_modes: ["*"]
+    tags: [insights, runtime]
+    scope: per_tag
+    priority: 2
+
+  - path: memory/{tag}/failure_patterns.json
+    title: Failure pattern stats + mutation tasks
+    applies_to_modes: ["review_failure", "specialize"]
+    tags: [failures, runtime]
+    scope: per_tag
+    priority: 2
+
+  - path: memory/{tag}/portfolio.json
+    title: Portfolio analysis (gaps, overcrowded directions)
+    applies_to_modes: ["specialize", "explore"]
+    tags: [portfolio, runtime]
+    scope: per_tag
+    priority: 3
+
+  - path: memory/{tag}/expression_index.json
+    title: Pass-rate by expression family / templates
+    applies_to_modes: ["*"]
+    tags: [history, runtime]
+    scope: per_tag
+    priority: 3
+
+  - path: memory/iteration_notes.md
+    title: Cross-session iteration log (R5 notes)
+    applies_to_modes: ["*"]
+    tags: [meta, history]
+    scope: global
+    priority: 5

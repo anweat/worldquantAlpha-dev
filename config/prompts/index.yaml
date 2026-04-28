@@ -1,0 +1,89 @@
+# Prompt registry index — maps prompt_kind to defaults.
+#
+# Per-template details live in config/prompts/<kind>.yaml. This index records:
+#   - default_model: model id used unless ai_service caller overrides
+#   - adapter_hint:  preferred adapter ("openai"|"glm"|"copilot_cli"|null=auto)
+#   - response_format: "json" | "text" — informs ai_service parsing
+#   - timeout_secs: per-call budget
+#
+# A prompt template is YAML with keys:
+#   system:    str  (jinja-ish "{{var}}" substitution)
+#   user:      str  (same)
+#   variables: list[str] — names the caller MUST supply (validated at render)
+#
+# All paths under prompts.<kind> map 1:1 to a file config/prompts/<kind>.yaml
+# (kind may contain '.' to namespace; e.g. "alpha_gen.explore" → file
+#  config/prompts/alpha_gen.explore.yaml). Missing files raise at registry load.
+
+defaults:
+  default_model: claude-sonnet-4.6
+  adapter_hint: null
+  response_format: json
+  timeout_secs: 120
+
+prompts:
+  alpha_gen.explore:
+    description: "Generate exploratory alpha expressions"
+    default_model: claude-sonnet-4.6
+    response_format: json
+    timeout_secs: 120
+
+  alpha_gen.repair:
+    description: "Generate repair-mode alphas guided by failure patterns"
+    default_model: claude-sonnet-4.6
+    response_format: json
+    timeout_secs: 120
+
+  alpha_gen.fragments:
+    description: "Generate signal/filter/weight fragments for combiner assembly"
+    default_model: claude-sonnet-4.6
+    response_format: json
+    timeout_secs: 180
+
+  failure_summary:
+    description: "Summarize recent failure batch into mutation tasks"
+    default_model: claude-opus-4.7
+    response_format: json
+    timeout_secs: 240
+
+  crawl_doc_summary:
+    description: "Summarize a single crawled document"
+    default_model: claude-sonnet-4.6
+    response_format: json
+    timeout_secs: 180
+
+  alpha_insight_extract:
+    description: "Extract direction / theme insights from passed alphas"
+    default_model: claude-sonnet-4.6
+    response_format: json
+    timeout_secs: 180
+
+  workspace_overview:
+    description: "Cross-cutting workspace status snapshot"
+    default_model: claude-sonnet-4.6
+    response_format: json
+    timeout_secs: 180
+
+  daily_summary:
+    description: "End-of-day summary across all workspaces"
+    default_model: claude-opus-4.7
+    response_format: json
+    timeout_secs: 300
+
+  longterm_summary_7d:
+    description: "Weekly retrospective + strategy proposal"
+    default_model: claude-opus-4.7
+    response_format: json
+    timeout_secs: 360
+
+  diversity_analysis:
+    description: "Portfolio direction-coverage gap analysis"
+    default_model: claude-sonnet-4.6
+    response_format: json
+    timeout_secs: 240
+
+  portfolio_analysis:
+    description: "Submitted portfolio metrics + correlation review"
+    default_model: claude-sonnet-4.6
+    response_format: json
+    timeout_secs: 180

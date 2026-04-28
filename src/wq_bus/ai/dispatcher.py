@@ -30,6 +30,7 @@ from wq_bus.ai.model_router import ModelRouter
 from wq_bus.ai.rate_limiter import RateLimiter
 from wq_bus.ai.strength import get_router as get_strength_router
 from wq_bus.data.state_db import record_ai_call, count_ai_calls_today
+from wq_bus.data import budget
 from wq_bus.utils.logging import get_logger
 from wq_bus.utils.tag_context import get_tag, with_tag, get_trace_id, new_trace_id, with_trace
 from wq_bus.utils.yaml_loader import load_yaml
@@ -255,18 +256,37 @@ class Dispatcher:
             return self._dry_run_response(agent_type, payload)
 
         # --- Daily AI cap check (auto only) ---
+        # Multi-process safe: pre-allocate 1 slot via budget.reserve(), then
+        # settle on completion (or release on failure). This prevents two
+        # processes both reading "today_count < cap" and exceeding the cap.
+        budget_owner: str | None = None
         if source == "auto":
             cap = _load_daily_cap()
-            today_count = 0
             try:
-                # Filter by source='auto' so manual calls don't burn the
-                # auto budget (the cap only blocks auto, but the count
-                # must match the cap's denominator — see is_capped()).
                 today_count = count_ai_calls_today(source="auto")
             except Exception:
-                pass
-            if today_count >= cap:
-                _log.warning("daily_ai_cap=%d reached (%d today) — blocking auto call to %s",
+                _log.exception(
+                    "count_ai_calls_today failed — treating daily cap as reached"
+                )
+                self._emit_budget_exhausted()
+                raise RuntimeError(
+                    "daily_ai_cap check failed (DB unreachable) — blocking auto call"
+                )
+            try:
+                granted, budget_owner = budget.reserve(
+                    "ai_auto", want=1, cap=cap, used_today=today_count,
+                    ttl_secs=300.0,
+                )
+            except Exception:
+                _log.exception(
+                    "budget.reserve(ai_auto) failed — blocking auto call (fail-safe)"
+                )
+                self._emit_budget_exhausted()
+                raise RuntimeError(
+                    "daily_ai_cap reservation failed (DB error) — blocking auto call"
+                )
+            if granted < 1:
+                _log.warning("daily_ai_cap=%d reached (used=%d, agent=%s) — blocking",
                              cap, today_count, agent_type)
                 self._emit_budget_exhausted()
                 raise RuntimeError(
@@ -280,18 +300,32 @@ class Dispatcher:
         # --- Dispatch ---
         cfg = self._router.resolve(agent_type)
 
-        if billing_mode == "per_token" or force_immediate or cfg["batch_size"] == 1:
-            return await self._direct_call(agent_type, payload, cfg,
-                                           adapter_name=adapter_name, strength=strength,
-                                           source=source)
+        try:
+            if billing_mode == "per_token" or force_immediate or cfg["batch_size"] == 1:
+                result = await self._direct_call(agent_type, payload, cfg,
+                                                 adapter_name=adapter_name, strength=strength,
+                                                 source=source)
+                if budget_owner:
+                    budget.settle("ai_auto", budget_owner, actual_used=1)
+                return result
 
-        # per_call → BatchBuffer keyed by (adapter_name, strength)
-        bucket_key = (adapter_name, strength)
-        buf = self._get_or_create_buffer(bucket_key)
-        payload["_strength"] = strength
-        payload["_adapter"] = adapter_name
-        payload["_source"] = source
-        return await buf.submit(agent_type, payload)
+            # per_call → BatchBuffer keyed by (adapter_name, strength)
+            bucket_key = (adapter_name, strength)
+            buf = self._get_or_create_buffer(bucket_key)
+            payload["_strength"] = strength
+            payload["_adapter"] = adapter_name
+            payload["_source"] = source
+            payload["_budget_owner"] = budget_owner  # buffer settles on flush
+            return await buf.submit(agent_type, payload)
+        except Exception:
+            # Failure path: release the held slot back to today's budget so
+            # a transient adapter error doesn't permanently consume cap.
+            if budget_owner:
+                try:
+                    budget.settle("ai_auto", budget_owner, actual_used=0)
+                except Exception:
+                    _log.exception("budget.settle(release on error) failed")
+            raise
 
     def _resolve_adapter(self, agent_type: str) -> tuple[str, str]:
         """Return (adapter_name, billing_mode) for agent_type from config."""
@@ -336,17 +370,53 @@ class Dispatcher:
         adapter_name: str,
         strength: str,
     ) -> list[dict]:
-        """Flush a bucket: NEVER mix strength in one package."""
-        # Strip internal routing fields from payloads
-        clean_payloads = []
+        """Flush a bucket: NEVER mix strength in one package.
+
+        ``source`` is propagated from the original payload (set in ``_source``
+        at submission time). When payloads disagree we fall back to "auto"
+        but log a warning — mixed-source bucketing means at least one call
+        will be billed against the wrong budget.
+        """
+        # Strip internal routing fields from payloads but capture _source first
+        clean_payloads: list[dict] = []
+        sources: set[str] = set()
+        budget_owners: list[str] = []
         for p in payloads:
+            sources.add(p.get("_source", "auto"))
+            owner = p.get("_budget_owner")
+            if owner:
+                budget_owners.append(owner)
             cp = {k: v for k, v in p.items() if not k.startswith("_")}
             clean_payloads.append(cp)
+        if len(sources) > 1:
+            _log.warning(
+                "_bucket_flush: mixed sources %s in single bucket flush for %s",
+                sources, agent_type,
+            )
+            effective_source = "auto"
+        else:
+            effective_source = next(iter(sources)) if sources else "auto"
 
-        return await self._flusher(
-            agent_type, clean_payloads,
-            adapter_name=adapter_name, strength=strength, source="auto",
-        )
+        try:
+            result = await self._flusher(
+                agent_type, clean_payloads,
+                adapter_name=adapter_name, strength=strength, source=effective_source,
+            )
+        except Exception:
+            # Release budget holds on failure so a transient error doesn't burn quota.
+            for owner in budget_owners:
+                try:
+                    budget.settle("ai_auto", owner, actual_used=0)
+                except Exception:
+                    _log.exception("budget.settle(release) failed for %s", owner)
+            raise
+        # Success: settle each held slot as actually used.
+        for owner in budget_owners:
+            try:
+                budget.settle("ai_auto", owner, actual_used=1)
+            except Exception:
+                _log.exception("budget.settle(used=1) failed for %s", owner)
+        return result
 
     async def _direct_call(
         self,
@@ -421,7 +491,16 @@ class Dispatcher:
             async with sem_ctx:
                 try:
                     self._cache.set_stage(pkg_id, "sent")
-                    response_text = await self._call_with_retry(adapter, messages, model, depth)
+                    # Hard timeout on the adapter call so a hung copilot/CLI
+                    # subprocess can't starve the per-adapter semaphore.
+                    # 600s is generous (large multi-agent packages legitimately
+                    # take 3-5min); raise via env if needed.
+                    import os
+                    _timeout = float(os.getenv("WQBUS_ADAPTER_TIMEOUT", "600"))
+                    response_text = await asyncio.wait_for(
+                        self._call_with_retry(adapter, messages, model, depth, adapter_name=adapter_name),
+                        timeout=_timeout,
+                    )
                     self._cache.write_raw_response(pkg_id, response_text)
                     self._cache.set_stage(pkg_id, "received")
                     results = subagent_packer.unpack(response_text, n)
@@ -436,7 +515,10 @@ class Dispatcher:
                     raise
                 finally:
                     duration_ms = int((time.monotonic() - t0) * 1000)
-                    if source == "auto":
+                    # Only count successful calls against the per-round cap so
+                    # provider-side errors (model unavailable, transient 5xx)
+                    # don't burn the agent's quota and starve subsequent retries.
+                    if source == "auto" and success:
                         self._limiter.register_call(agent_type)
 
                     ai_call_id = self._safe_record(
@@ -609,12 +691,48 @@ class Dispatcher:
 
         return [results_by_id[t["id"]] for t in tasks]
 
-    async def _call_with_retry(self, adapter, messages, model, depth, *, max_retries=1):
-        """Call adapter, retry once on network/timeout/JSON-parse errors."""
+    async def _call_with_retry(self, adapter, messages, model, depth, *, max_retries=1, adapter_name: str = "copilot_cli"):
+        """Call adapter, retry once on network/timeout/JSON-parse errors.
+
+        On ModelUnavailableError (model not entitled / network down for premium
+        models), retry once with the configured fallback model (default gpt-5.4)
+        WITHOUT counting against retries — this is a config/transport issue, not
+        a quota issue.
+        """
+        from wq_bus.ai.adapters.copilot_cli import ModelUnavailableError
+
+        # Resolve fallback model lazily (config/ai_dispatch.yaml > env > hardcode).
+        def _fallback_model() -> str:
+            try:
+                cfg = load_yaml("ai_dispatch") or {}
+                fb = (cfg.get("adapter_fallbacks") or {}).get(adapter_name) or {}
+                m = fb.get("on_model_unavailable")
+                if m:
+                    return str(m)
+            except Exception:
+                pass
+            return os.getenv("WQBUS_AI_FALLBACK_MODEL", "gpt-5.4")
+
         last_exc = None
+        cur_model = model
+        fallback_used = False
         for attempt in range(max_retries + 1):
             try:
-                return await adapter.call(messages, model, depth)
+                return await adapter.call(messages, cur_model, depth)
+            except ModelUnavailableError as exc:
+                if not fallback_used:
+                    fb = _fallback_model()
+                    if fb and fb != cur_model:
+                        _log.warning(
+                            "model %r unavailable on %s — auto-falling-back to %r (%s)",
+                            cur_model, adapter_name, fb, exc,
+                        )
+                        cur_model = fb
+                        fallback_used = True
+                        # Don't sleep; immediate retry with new model.
+                        continue
+                last_exc = exc
+                break  # already tried fallback; surface to caller
             except Exception as exc:
                 last_exc = exc
                 if attempt < max_retries:
@@ -650,22 +768,74 @@ class Dispatcher:
     def _dry_run_response(self, agent_type: str, payload: dict) -> dict:
         """Stub response realistic enough to drive the bus end-to-end."""
         if agent_type == "alpha_gen":
-            n = int(payload.get("n_requested") or payload.get("n") or 3)
+            v = payload.get("vars") or {}
+            # Detect fragments-mode by either explicit prompt_kind or the
+            # presence of n_signals (the fragments prompt's primary var).
+            kind = (payload.get("prompt_kind") or v.get("prompt_kind") or "").strip()
+            n_sig = (payload.get("n_signals") or v.get("n_signals"))
+            is_fragments = (kind == "alpha_gen.fragments") or (n_sig is not None)
+
             import random as _r
             seed = int(time.time() * 1000) % 100000
-            base = [
-                f"rank(liabilities/assets) * {seed % 7 + 1}",
-                f"rank(operating_income/(assets+{seed % 13}))",
-                f"rank(ts_delta(close, {(seed % 5) + 3}))",
-                f"group_rank(retained_earnings/assets, sector) - {seed % 3}",
-                f"rank(cash/(assets+{(seed * 3) % 11}))",
-                f"rank(operating_cash_flow/(assets+{seed % 17}))",
-            ]
-            _r.shuffle(base)
-            response = {"expressions": [
-                {"expression": expr, "rationale": "dry-run stub", "settings_overrides": {}}
-                for expr in base[:max(1, n)]
-            ]}
+
+            if is_fragments:
+                n_signals = int(n_sig or 8)
+                n_filters = int(payload.get("n_filters") or v.get("n_filters") or 3)
+                n_weights = int(payload.get("n_weights") or v.get("n_weights") or 2)
+                sig_pool = [
+                    "rank(operating_income/(assets+1))",
+                    "rank(cash/(assets+1))",
+                    "group_rank(retained_earnings/(equity+1), sector)",
+                    "rank(ts_delta(sales, 252)/(sales+1))",
+                    "rank(-ts_corr(ts_rank(volume,60), ts_rank(close,60), 60))",
+                    "rank(ts_decay_linear(-ts_sum(returns,5), 20))",
+                    "rank(-ts_std_dev(returns, 60))",
+                    "group_rank(ts_rank(operating_income/assets, 252), industry)",
+                    "rank(gross_profit/(assets+1))",
+                    "signed_power(rank(ebit/(equity+1)), 0.5)",
+                ]
+                flt_pool = [
+                    "greater(volume, ts_mean(volume, 60))",
+                    "greater(close, ts_mean(close, 60))",
+                    "and(greater(assets, 0), greater(volume, ts_mean(volume,60)))",
+                    "less(ts_std_dev(returns,60), 0.05)",
+                ]
+                wt_pool = [
+                    "1/sqrt(ts_std_dev(returns,60)+1e-6)",
+                    "log(1+ts_sum(volume,60))",
+                ]
+                _r.shuffle(sig_pool); _r.shuffle(flt_pool); _r.shuffle(wt_pool)
+                response = {
+                    "signals": [
+                        {"expr": e, "family_hint": f"F{(i%7)+1}:dry-run",
+                         "rationale": "dry-run stub"}
+                        for i, e in enumerate(sig_pool[:max(1, n_signals)])
+                    ],
+                    "filters": [
+                        {"expr": e, "rationale": "dry-run stub"}
+                        for e in flt_pool[:max(0, n_filters)]
+                    ],
+                    "weights": [
+                        {"expr": e, "rationale": "dry-run stub"}
+                        for e in wt_pool[:max(0, n_weights)]
+                    ],
+                }
+            else:
+                n = int(payload.get("n_requested") or payload.get("n")
+                        or v.get("n_requested") or v.get("n") or 3)
+                base = [
+                    f"rank(liabilities/assets) * {seed % 7 + 1}",
+                    f"rank(operating_income/(assets+{seed % 13}))",
+                    f"rank(ts_delta(close, {(seed % 5) + 3}))",
+                    f"group_rank(retained_earnings/assets, sector) - {seed % 3}",
+                    f"rank(cash/(assets+{(seed * 3) % 11}))",
+                    f"rank(operating_cash_flow/(assets+{seed % 17}))",
+                ]
+                _r.shuffle(base)
+                response = {"expressions": [
+                    {"expression": expr, "rationale": "dry-run stub", "settings_overrides": {}}
+                    for expr in base[:max(1, n)]
+                ]}
         elif agent_type == "failure_analyzer":
             response = {"summary": "[dry-run] no real failures analyzed",
                         "mutation_tasks": []}

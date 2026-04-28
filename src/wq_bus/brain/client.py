@@ -102,6 +102,15 @@ class BrainClient:
         """
         url = f"{BASE_URL}{path}"
 
+        # Network-layer transient errors that deserve the same backoff as 429/503.
+        # urllib3.ProtocolError covers RemoteDisconnected; requests wraps both into
+        # ConnectionError but stream/keep-alive paths can still surface raw classes.
+        _TRANSIENT = (
+            requests.exceptions.ConnectionError,
+            requests.exceptions.ChunkedEncodingError,
+            requests.exceptions.Timeout,
+        )
+
         for attempt in range(_BACKOFF_RETRIES):
             now = time.time()
             # Track call timestamp for rate denominator
@@ -113,10 +122,19 @@ class BrainClient:
                 while BrainClient._total_calls_5min and BrainClient._total_calls_5min[0] < cutoff:
                     BrainClient._total_calls_5min.popleft()
 
-            resp = self.session.request(
-                method, url, headers=_HEADERS, params=params, json=json,
-                stream=stream, timeout=_HTTP_TIMEOUT,
-            )
+            try:
+                resp = self.session.request(
+                    method, url, headers=_HEADERS, params=params, json=json,
+                    stream=stream, timeout=_HTTP_TIMEOUT,
+                )
+            except _TRANSIENT as e:
+                backoff = min(_BACKOFF_CAP, _BACKOFF_BASE * (2 ** attempt) + random.uniform(0, 1))
+                print(
+                    f"  [NET-{type(e).__name__}] backoff {backoff:.1f}s "
+                    f"(attempt {attempt + 1}/{_BACKOFF_RETRIES})"
+                )
+                time.sleep(backoff)
+                continue
 
             if resp.status_code not in (429, 503):
                 return resp
@@ -269,12 +287,41 @@ class BrainClient:
         return self.get_alpha(alpha_id)
 
     def _poll(self, sim_id: str, *, poll_interval: int, max_wait: int) -> dict:
-        """Poll GET /simulations/{id} until terminal status."""
+        """Poll GET /simulations/{id} until terminal status.
+
+        Robustness:
+        - Aborts after MAX consecutive HTTP errors so a stuck 500/401 doesn't
+          hold a sim slot forever.
+        - On 401, makes one re-auth attempt then continues — covers expired
+          session cookies during long polls.
+        - Re-checks the deadline inside the except branch so a flapping endpoint
+          can't extend total wait indefinitely.
+        """
+        MAX_CONSECUTIVE_ERRORS = 3
         deadline = time.time() + max_wait
+        consecutive_errors = 0
+        reauth_tried = False
         while time.time() < deadline:
             try:
                 data = self._get(f"/simulations/{sim_id}")
-            except requests.HTTPError:
+                consecutive_errors = 0
+            except requests.HTTPError as exc:
+                consecutive_errors += 1
+                status_code = getattr(getattr(exc, "response", None), "status_code", None)
+                if status_code == 401 and not reauth_tried:
+                    reauth_tried = True
+                    try:
+                        from wq_bus.brain.auth import ensure_session
+                        if ensure_session(force=True):
+                            self.session = load_session(self._state_path)
+                    except Exception:
+                        pass
+                if consecutive_errors >= MAX_CONSECUTIVE_ERRORS:
+                    return {"error": "poll_http_error", "sim_id": sim_id,
+                            "status_code": status_code,
+                            "consecutive": consecutive_errors}
+                if time.time() + poll_interval >= deadline:
+                    return {"error": "timeout", "sim_id": sim_id}
                 time.sleep(poll_interval)
                 continue
 

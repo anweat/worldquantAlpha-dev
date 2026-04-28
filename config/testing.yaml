@@ -1,0 +1,97 @@
+# testing.yaml - 测试与反馈配置
+#
+# 控制模拟测试流程、反馈收集、结果验证
+
+simulation:
+  batch_size: 100                      # 每批测试数量
+  max_workers: 3                       # 并发线程数（避免API 429）
+  retry_on_error: true
+  max_retries: 2
+  timeout_seconds: 600                  # 单个模拟超时
+  poll_interval: 8                      # 轮询间隔（秒）
+
+  settings_presets:
+    SUB: {decay: 0, neutralization: SUBINDUSTRY, truncation: 0.08, nanHandling: ON}
+    IND: {decay: 0, neutralization: INDUSTRY, truncation: 0.08, nanHandling: ON}
+    MKT: {decay: 0, neutralization: MARKET, truncation: 0.08, nanHandling: ON}
+    SUB4: {decay: 4, neutralization: SUBINDUSTRY, truncation: 0.08, nanHandling: ON}
+    VOL: {decay: 4, neutralization: MARKET, truncation: 0.05, nanHandling: OFF}
+
+feedback:
+  collect_interval: 10                  # 每N个alpha收集一次反馈
+  min_samples_for_learning: 20          # 开始学习的最小样本数
+
+  metrics:
+    primary:
+      - sharpe
+      - fitness
+      - turnover
+      - returns
+    secondary:
+      - drawdown
+      - max_weight
+      - concentration
+
+  thresholds:
+    sharpe_min: 1.0
+    fitness_min: 1.0
+    turnover_max: 0.20
+    turnover_min: 0.01
+    returns_min: 0.08
+    drawdown_max: 0.30
+    concentration_max: 0.10
+
+validation:
+  checks:
+    - name: SELF_CORRELATION
+      required: true
+      threshold: 0.7                    # 自相关系数阈值
+    - name: LOW_SHARPE
+      threshold: 1.0
+    - name: HIGH_TURNOVER
+      threshold: 0.20
+    - name: LOW_FITNESS
+      threshold: 1.0
+    - name: CONCENTRATED_WEIGHT
+      threshold: 0.10
+
+result_storage:
+  path: "results"
+  format: json
+  compression: false
+  save_failed_results: true
+  save_passed_results: true
+  save_partial_results: true           # 保存部分结果的中间状态
+
+reporting:
+  generate_summary: true
+  include_charts: false                # 可选：生成图表
+  export_csv: false
+
+  metrics_summary:
+    - total_tested
+    - qualified_count
+    - submission_count
+    - error_count
+    - pass_rate
+    - avg_sharpe
+    - avg_fitness
+    - avg_turnover
+
+analysis:
+  run_on_completion: true
+  include_correlation_matrix: true
+  include_category_breakdown: true
+  include_parameter_sensitivity: true
+
+  visualizations:
+    - type: scatter
+      x: sharpe
+      y: fitness
+      color: category
+    - type: histogram
+      field: turnover
+    - type: heatmap
+      x: decay
+      y: neutralization
+      value: pass_rate

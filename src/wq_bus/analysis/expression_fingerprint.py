@@ -16,7 +16,7 @@ from typing import NamedTuple
 
 from wq_bus.data import knowledge_db
 
-_PROJECT_ROOT = Path(__file__).resolve().parents[3]
+from wq_bus.utils.paths import PROJECT_ROOT as _PROJECT_ROOT  # noqa: E402
 _OPERATORS_FILE = _PROJECT_ROOT / "operators_full.json"
 
 # Fallback operator set if operators_full.json is not available
@@ -108,21 +108,69 @@ def parse_expression(expr: str) -> dict[str, object]:
     return {"ops": sorted(set(ops)), "fields": fields, "skeleton": skeleton}
 
 
+# Commutative operators whose first 2 args are interchangeable.
+# Sorting these args before hashing ensures ts_corr(a,b,n) and ts_corr(b,a,n)
+# yield the same fingerprint (they are mathematically identical).
+_COMMUTATIVE_OPS: frozenset[str] = frozenset({
+    "ts_corr", "correlation", "covariance", "ts_covariance",
+    "add", "multiply", "max", "min",
+})
+
+
+def _canonicalize_commutative(expr: str) -> str:
+    """Sort the first 2 args of commutative operator calls (best-effort).
+
+    Handles single-level nesting (good enough for fingerprint dedupe; perfect
+    canonicalization would require a full parser, which is overkill here).
+    """
+    def _rewrite(m: re.Match) -> str:
+        op = m.group(1)
+        args_str = m.group(2)
+        # Split on commas at depth-0 only
+        depth = 0
+        parts: list[str] = []
+        last = 0
+        for i, ch in enumerate(args_str):
+            if ch == "(":
+                depth += 1
+            elif ch == ")":
+                depth -= 1
+            elif ch == "," and depth == 0:
+                parts.append(args_str[last:i].strip())
+                last = i + 1
+        parts.append(args_str[last:].strip())
+        if len(parts) >= 2:
+            a, b = sorted(parts[:2])
+            parts = [a, b] + parts[2:]
+        return f"{op}({', '.join(parts)})"
+
+    pattern = re.compile(
+        r"\b(" + "|".join(re.escape(o) for o in _COMMUTATIVE_OPS) + r")\s*\(([^()]*)\)"
+    )
+    # Iterate until no further rewrites (handles a single level of nesting per pass)
+    prev = None
+    cur = expr
+    for _ in range(5):
+        if cur == prev:
+            break
+        prev = cur
+        cur = pattern.sub(_rewrite, cur)
+    return cur
+
+
 def fingerprint(expr: str) -> tuple[str, dict[str, object]]:
     """Compute (sha256_hex, parse_dict) for an expression.
 
-    The hash is computed over the skeleton (normalized form), making
-    structurally identical expressions with different field names produce
-    different hashes, while numeric constant variations produce the same hash.
+    Normalisation steps before hashing:
+      1. Lowercase + collapse whitespace.
+      2. Canonicalise commutative operator args (ts_corr/correlation/...).
 
-    Actually: we hash the full normalized expression (lowercased, whitespace
-    collapsed) so that two expressions identical up to whitespace/case yield
-    the same hash.
+    Result: ``rank( a / b )`` == ``rank(a/b)`` and ``ts_corr(close,volume,20)``
+    == ``ts_corr(volume,close,20)`` produce the same fingerprint.
     """
     parsed = parse_expression(expr)
-    # Normalise: lowercase + remove ALL whitespace for the hash input so that
-    # "rank(a / b)" and "rank( a  /  b )" produce the same fingerprint.
-    normalised = re.sub(r"\s+", "", expr.strip().lower())
+    canonical = _canonicalize_commutative(expr.strip().lower())
+    normalised = re.sub(r"\s+", "", canonical)
     sha = hashlib.sha256(normalised.encode("utf-8")).hexdigest()
     return sha, parsed
 

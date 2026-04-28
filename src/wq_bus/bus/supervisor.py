@@ -66,9 +66,27 @@ class TraceSupervisor:
             await asyncio.sleep(self._tick_secs)
 
     async def _tick(self) -> None:
-        from wq_bus.bus.tasks import list_active_traces, timeout_task
+        from wq_bus.bus.tasks import list_active_traces, timeout_task, prune_orphan_handles
         now_iso = _utcnow_iso()
         now_ts = time.time()
+
+        # Periodically reap handles whose DB row was closed elsewhere so
+        # _HANDLES doesn't leak across days. Cheap when no orphans exist.
+        try:
+            n_pruned = prune_orphan_handles()
+            if n_pruned:
+                _log.info("Supervisor: pruned %d orphan handles", n_pruned)
+        except Exception:
+            _log.exception("Supervisor: prune_orphan_handles raised")
+
+        # Sweep dead daily-budget reservations across all scopes (cheap when empty).
+        try:
+            from wq_bus.data import budget as _budget
+            n_swept = _budget.sweep_expired()
+            if n_swept:
+                _log.info("Supervisor: swept %d expired budget reservations", n_swept)
+        except Exception:
+            _log.exception("Supervisor: budget.sweep_expired raised")
 
         try:
             traces = list_active_traces()
@@ -144,9 +162,7 @@ class TraceSupervisor:
         return self._running
 
 
-def _utcnow_iso() -> str:
-    from datetime import datetime, timezone
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+from wq_bus.utils.timeutil import utcnow_iso as _utcnow_iso  # noqa: E402
 
 
 def _parse_ts(value: str | float) -> float:

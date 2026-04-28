@@ -1,0 +1,96 @@
+# Topic registry — bus event topic + artifact placement metadata.
+#
+# Each topic (= a bus event type) maps to:
+#   scope:    workspace classification rule
+#               "tag"    -> tagged workspace memory/<dataset_tag>/
+#               "global" -> untagged shared workspace memory/_global/
+#               "either" -> use event.dataset_tag if non-empty, else _global
+#   subspace: slash-separated subindex path under the workspace
+#               summarizer/curator queries by (scope, subspace[ glob ])
+#   searchable: bool (default false). Hint for indexers; non-searchable topics
+#               are still persisted but skipped by summarizer pulls.
+#   retention_days: prune budget for events table & artifact files
+#
+# Add a new topic:
+#   1. register_topic("MY_TOPIC", ...) in src/wq_bus/bus/events.py
+#   2. add an entry below
+# Missing entries fall back to `defaults`.
+
+defaults:
+  scope: either
+  subspace: events/misc
+  searchable: false
+  retention_days: 30
+
+topics:
+  # ---- Alpha generation flow (per-dataset) ----
+  GENERATE_REQUESTED:      {scope: tag, subspace: alpha/requests, retention_days: 60}
+  ALPHA_DRAFTED:           {scope: tag, subspace: alpha/drafted,   searchable: true, retention_days: 90}
+  ALPHA_SIMULATED:         {scope: tag, subspace: alpha/simulated, searchable: true, retention_days: 180}
+  ALPHA_SIM_ERRORED:       {scope: tag, subspace: failures/simulation, searchable: true, retention_days: 90}
+  ALPHA_GEN_ERRORED:       {scope: tag, subspace: failures/generation, searchable: true, retention_days: 90}
+  IS_RESULT:               {scope: tag, subspace: alpha/is_result, retention_days: 90}
+  IS_PASSED:               {scope: tag, subspace: alpha/passed,    searchable: true, retention_days: 365}
+  SC_RESULT:               {scope: tag, subspace: alpha/sc,        retention_days: 90}
+  ALPHA_SUBMITTED:         {scope: tag, subspace: alpha/submitted, searchable: true, retention_days: 365}
+  ALPHA_SUBMIT_FAILED:     {scope: tag, subspace: failures/submission, searchable: true, retention_days: 180}
+  SUBMITTED:               {scope: tag, subspace: alpha/submitted, searchable: true, retention_days: 365}
+  SUBMISSION_FAILED:       {scope: tag, subspace: failures/submission, searchable: true, retention_days: 180}
+  BATCH_DONE:              {scope: tag, subspace: alpha/batch,     retention_days: 60}
+
+  # ---- Recipes / pool (per-dataset) ----
+  RECIPE_PROPOSED:         {scope: tag, subspace: recipes/proposed,   retention_days: 60}
+  RECIPE_CANDIDATES_READY: {scope: tag, subspace: recipes/candidates, retention_days: 60}
+  POOL_UPDATED:            {scope: tag, subspace: pool/updates,       retention_days: 30}
+  POOL_STATS_UPDATED:      {scope: tag, subspace: pool/stats,         retention_days: 30}
+  STRENGTH_OVERRIDE_SET:   {scope: tag, subspace: pool/strength,      retention_days: 30}
+
+  # ---- Analysis / learning (per-dataset, long retention) ----
+  PORTFOLIO_ANALYZED:      {scope: tag, subspace: portfolio/analysis, searchable: true, retention_days: 180}
+  LEARNING_DRAFTED:        {scope: tag, subspace: learnings,          searchable: true, retention_days: 365}
+  FAILURE_BATCH_READY:     {scope: tag, subspace: failures/batches,   searchable: true, retention_days: 90}
+
+  # ---- Crawler / docs (untagged shared) ----
+  CRAWL_REQUESTED:         {scope: global, subspace: crawl/requests, retention_days: 30}
+  DOC_FETCHED:             {scope: global, subspace: crawl/fetched, searchable: true, retention_days: 90}
+  KNOWLEDGE_UPDATED:       {scope: either, subspace: knowledge/updates, searchable: true, retention_days: 180}
+
+  # ---- Task lifecycle (cross-cutting; either) ----
+  TASK_STARTED:            {scope: either, subspace: task/lifecycle, retention_days: 60}
+  TASK_COMPLETED:          {scope: either, subspace: task/lifecycle, retention_days: 60}
+  TASK_FAILED:             {scope: either, subspace: task/lifecycle, retention_days: 90}
+  TASK_TIMEOUT:            {scope: either, subspace: task/lifecycle, retention_days: 90}
+  TASK_CANCEL_REQUESTED:   {scope: either, subspace: task/lifecycle, retention_days: 30}
+  TASK_PAUSE_REQUESTED:    {scope: either, subspace: task/lifecycle, retention_days: 30}
+  TASK_RESUME_REQUESTED:   {scope: either, subspace: task/lifecycle, retention_days: 30}
+  TASK_CANCELLED:          {scope: either, subspace: task/lifecycle, retention_days: 60}
+  TASK_PAUSED:             {scope: either, subspace: task/lifecycle, retention_days: 30}
+  TASK_RESUMED:            {scope: either, subspace: task/lifecycle, retention_days: 30}
+
+  # ---- Health / API (untagged shared) ----
+  HEALTH_PROBE_DONE:       {scope: global, subspace: health/probes,     retention_days: 7}
+  API_DEGRADED:            {scope: global, subspace: health/incidents,  retention_days: 90}
+  API_RESTORED:            {scope: global, subspace: health/incidents,  retention_days: 90}
+  RATE_PRESSURE:           {scope: global, subspace: health/pressure,   retention_days: 7}
+  SESSION_INVALID:         {scope: global, subspace: health/auth,       retention_days: 30}
+  BUDGET_EXHAUSTED:        {scope: global, subspace: health/budget,     retention_days: 30}
+
+  # ---- AI infrastructure ----
+  AI_CACHE_REISSUED:       {scope: either, subspace: ai/cache,          retention_days: 30}
+
+  # ---- R6-C: trace lifecycle ----
+  TRACE_COMPLETED:         {scope: either, subspace: task/trace, retention_days: 60}
+  TRACE_FAILED:            {scope: either, subspace: task/trace, retention_days: 90}
+
+  # ---- R6-C: task outer-loop lifecycle ----
+  TASK_ITERATION_DONE:     {scope: either, subspace: task/iterations, retention_days: 60}
+  TASK_GOAL_SATISFIED:     {scope: either, subspace: task/lifecycle,  retention_days: 90}
+  TASK_EXHAUSTED:          {scope: either, subspace: task/lifecycle,  retention_days: 90}
+
+  # ---- R6-C: unified AI dispatch ----
+  AI_CALL_REQUESTED:       {scope: either, subspace: ai/requests, retention_days: 30}
+  AI_CALL_DONE:            {scope: either, subspace: ai/responses, searchable: true, retention_days: 60}
+  AI_CALL_FAILED:          {scope: either, subspace: ai/failures, searchable: true, retention_days: 90}
+
+  # ---- R6-C: summarizer agent ----
+  SUMMARIZER_DONE:         {scope: either, subspace: summaries, searchable: true, retention_days: 180}

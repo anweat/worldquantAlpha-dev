@@ -1,0 +1,27 @@
+prompt_kind: crawl_doc_summary
+description: Summarize a single crawled document into actionable insights.
+
+variables:
+  - source
+  - title
+  - body_md
+
+system: |
+  You extract reusable quantitative trading insights from research documents.
+  Focus on signals/operators relevant to FE alpha construction. Skip
+  marketing fluff. If the document is irrelevant, say so explicitly.
+
+user: |
+  Source: {{source}}
+  Title: {{title}}
+
+  Document:
+  {{body_md}}
+
+  Respond with strict JSON:
+  {
+    "relevant": <bool>,
+    "summary": "<3-5 sentences>",
+    "actionable_insights": ["<bullet>", ...],
+    "suggested_directions": ["<theme>", ...]
+  }

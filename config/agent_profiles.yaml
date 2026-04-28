@@ -152,3 +152,11 @@ concurrency:
     openai_gpt5: 4
     glm_4_5: 4
 
+# ---------------------------------------------------------------------------
+# Context budget (rev-h7) — used by ContextCurator
+# Only enforced when the agent's adapter has billing_mode=per_token.
+# per_call adapters get unlimited context (cost is per call, not per token).
+# ---------------------------------------------------------------------------
+context:
+  token_cap: 20000   # ~80k chars; soft cap, curator drops lowest-scored items first
+

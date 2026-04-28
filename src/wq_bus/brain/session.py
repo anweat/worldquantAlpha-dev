@@ -9,7 +9,7 @@ from pathlib import Path
 
 import requests
 
-_PROJECT_ROOT = Path(__file__).resolve().parents[3]  # src/wq_bus/brain/session.py -> project root
+from wq_bus.utils.paths import PROJECT_ROOT as _PROJECT_ROOT  # noqa: E402
 _DEFAULT_STATE_PATH = _PROJECT_ROOT / ".state" / "session.json"
 
 

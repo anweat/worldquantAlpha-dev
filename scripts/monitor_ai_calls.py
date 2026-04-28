@@ -403,13 +403,17 @@ def run_monitor(
     else:
         print("  [OK] No alarms — call frequency within acceptable bounds")
 
-    # Save report
+    # Save report (atomic via tmp+os.replace — N70: prevents partial JSON
+    # being read by a concurrent dashboard reader if we crash mid-write)
     REPORT_DIR.mkdir(exist_ok=True)
     out_path = REPORT_DIR / "ai_freq_monitor.json"
-    out_path.write_text(
+    import os as _os
+    tmp_path = out_path.with_suffix(out_path.suffix + ".tmp")
+    tmp_path.write_text(
         json.dumps(report, indent=2, ensure_ascii=False, default=str),
         encoding="utf-8",
     )
+    _os.replace(tmp_path, out_path)
     print(f"  Saved: {out_path}")
 
     if output_json:

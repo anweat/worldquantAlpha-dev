@@ -17,7 +17,7 @@ from wq_bus.bus.events import Event, Topic, make_event
 if TYPE_CHECKING:
     from wq_bus.brain.client import BrainClient
 
-PROJECT_ROOT = Path(__file__).resolve().parents[3]
+from wq_bus.utils.paths import PROJECT_ROOT  # noqa: E402
 MEMORY_DIR = PROJECT_ROOT / "memory"
 
 
@@ -57,15 +57,22 @@ class PortfolioAnalyzer(AgentBase):
             except Exception:
                 recent_n = 100
         loop = asyncio.get_running_loop()
-        # PnL correlation in executor (network-heavy)
+        # PnL correlation in executor (network-heavy). Tag context is contextvar-
+        # based and does not propagate into thread executors — propagate explicitly.
+        from wq_bus.utils.tag_context import with_tag
+
+        def _run_corr():
+            with with_tag(tag):
+                return compute_pairwise_corr(self.client, 0.7, 100, recent_n)
+
         try:
-            corr_pairs = await loop.run_in_executor(
-                None, compute_pairwise_corr, self.client, 0.7, 100, recent_n,
-            )
+            corr_pairs = await loop.run_in_executor(None, _run_corr)
         except TypeError:
             # function may have keyword-only args; fall back to sync direct call
-            corr_pairs = compute_pairwise_corr(self.client, recent_n=recent_n)
-        overfit = analyze_overfit()
+            with with_tag(tag):
+                corr_pairs = compute_pairwise_corr(self.client, recent_n=recent_n)
+        with with_tag(tag):
+            overfit = analyze_overfit()
 
         out = {"corr_pairs": corr_pairs, "overfit": overfit}
         out_dir = MEMORY_DIR / tag

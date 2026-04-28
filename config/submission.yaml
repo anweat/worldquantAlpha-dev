@@ -8,3 +8,8 @@ daily_max: 6
 max_per_flush: 4
 # Dead-letter after this many transient failures (Submitter.max_retries).
 max_retries: 3
+
+# Round-5 b2/b4: simulation poll timeouts (sim_executor → BrainClient._poll)
+simulation:
+  poll_timeout_sec: 600     # hard wall-clock cap per simulate() call
+  poll_interval_sec: 8      # base polling interval

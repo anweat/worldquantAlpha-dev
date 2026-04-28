@@ -16,7 +16,7 @@ import sys
 from collections import OrderedDict
 from pathlib import Path
 
-PROJECT_ROOT = Path(__file__).resolve().parents[3]
+from wq_bus.utils.paths import PROJECT_ROOT  # noqa: E402
 LOG_DIR = PROJECT_ROOT / "logs"
 LOG_DIR.mkdir(exist_ok=True)
 

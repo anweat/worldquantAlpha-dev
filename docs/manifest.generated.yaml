@@ -1,0 +1,444 @@
+generated_at: '2026-04-28T06:03:10Z'
+source: scripts/manifest_builder.py
+entries:
+- path: docs/03_运算符完整参考手册.md
+  title: FE operator reference (66 ops, signatures, pitfalls)
+  applies_to_modes:
+  - '*'
+  tags:
+  - operators
+  - reference
+  scope: global
+  priority: 1
+  size: 11183
+  mtime: '2026-04-25'
+  summary: 03 运算符完整参考手册
+- path: docs/05_性能指标与提交标准.md
+  title: IS metrics + submission gates (sharpe/fitness/turnover)
+  applies_to_modes:
+  - '*'
+  tags:
+  - metrics
+  - submission
+  scope: global
+  priority: 1
+  size: 8683
+  mtime: '2026-04-25'
+  summary: 05 性能指标解读与提交标准
+- path: memory/{tag}/dataset_insights.md
+  title: Workspace insights — field discovery, pass rates per family
+  applies_to_modes:
+  - '*'
+  tags:
+  - insights
+  - runtime
+  scope: per_tag
+  priority: 1
+  size: 5413
+  mtime: '2026-04-25'
+  summary: memory/dataset_insights.md — 数据集实战经验摘要
+- path: memory/{tag}/next_session_context.md
+  title: Last-session recap — top alphas, queue state, recommendations
+  applies_to_modes:
+  - '*'
+  tags:
+  - recap
+  - runtime
+  scope: per_tag
+  priority: 1
+  size: 3155
+  mtime: '2026-04-25'
+  summary: Next Session Context — 2026-04-22
+- path: docs/02_Fast_Expression_语言指南.md
+  title: FE language guide — syntax, types, common patterns
+  applies_to_modes:
+  - explore
+  - specialize
+  - review_failure
+  tags:
+  - language
+  - syntax
+  scope: global
+  priority: 2
+  size: 8762
+  mtime: '2026-04-25'
+  summary: 02 Fast Expression 语言完全指南
+- path: docs/06_数据字段与数据集.md
+  title: Datasets & field families (fundamentals, prices, analyst)
+  applies_to_modes:
+  - explore
+  - specialize
+  - track_news
+  tags:
+  - fields
+  - datasets
+  scope: global
+  priority: 2
+  size: 7891
+  mtime: '2026-04-25'
+  summary: 06 数据字段与数据集
+- path: docs/architecture/COMPOSITION_RECIPES.md
+  title: Recipe composition patterns (signal × filter × weight)
+  applies_to_modes:
+  - '*'
+  tags:
+  - recipes
+  - composition
+  scope: global
+  priority: 2
+  size: 5352
+  mtime: '2026-04-26'
+  summary: COMPOSITION_RECIPES — 算子组合 → 主题映射池
+- path: memory/{tag}/failure_patterns.json
+  title: Failure pattern stats + mutation tasks
+  applies_to_modes:
+  - review_failure
+  - specialize
+  tags:
+  - failures
+  - runtime
+  scope: per_tag
+  priority: 2
+  size: 100
+  mtime: '2026-04-28'
+  summary: '[dry-run] no real failures analyzed'
+- path: memory/{tag}/insights.md
+  title: Aggregate insights (combined sources)
+  applies_to_modes:
+  - '*'
+  tags:
+  - insights
+  - runtime
+  scope: per_tag
+  priority: 2
+  size: 214
+  mtime: '2026-04-28'
+  summary: Dataset Insights — usa_top
+- path: docs/07_Alpha开发实战指南.md
+  title: Practical alpha dev playbook (recipes, examples)
+  applies_to_modes:
+  - explore
+  - specialize
+  tags:
+  - recipes
+  - examples
+  scope: global
+  priority: 3
+  size: 8913
+  mtime: '2026-04-25'
+  summary: 07 Alpha 开发实战指南
+- path: docs/11_进阶Alpha知识与策略.md
+  title: Advanced alpha strategies (sector, neutralization)
+  applies_to_modes:
+  - specialize
+  tags:
+  - advanced
+  - strategies
+  scope: global
+  priority: 3
+  size: 22607
+  mtime: '2026-04-25'
+  summary: 11 进阶 Alpha 知识与策略
+- path: docs/13_alpha_defects_and_community_wisdom.md
+  title: Common alpha defects to avoid
+  applies_to_modes:
+  - review_failure
+  - explore
+  tags:
+  - pitfalls
+  - defects
+  scope: global
+  priority: 3
+  size: 43326
+  mtime: '2026-04-25'
+  summary: 13 Alpha 缺陷模式、社区智慧与深度实战分析
+- path: memory/{tag}/expression_index.json
+  title: Pass-rate by expression family / templates
+  applies_to_modes:
+  - '*'
+  tags:
+  - history
+  - runtime
+  scope: per_tag
+  priority: 3
+  size: 12532
+  mtime: '2026-04-25'
+  summary: 'json keys: generated,total_expressions,categories'
+- path: memory/{tag}/portfolio.json
+  title: Portfolio analysis (gaps, overcrowded directions)
+  applies_to_modes:
+  - specialize
+  - explore
+  tags:
+  - portfolio
+  - runtime
+  scope: per_tag
+  priority: 3
+  size: 145
+  mtime: '2026-04-28'
+  summary: 'json keys: dataset_tag,generated_at,directions,gap_analysis,recommendations'
+- path: docs/00_从零理解BRAIN平台与FE表达式.md
+  title: 00 从零理解BRAIN平台与FE表达式
+  applies_to_modes:
+  - '*'
+  tags:
+  - reference
+  scope: global
+  priority: 4
+  size: 24140
+  mtime: '2026-04-25'
+  summary: 从零理解 WorldQuant BRAIN 平台与 Fast Expression 语言
+- path: docs/01_量化交易与BRAIN平台概述.md
+  title: 01 量化交易与BRAIN平台概述
+  applies_to_modes:
+  - '*'
+  tags:
+  - reference
+  scope: global
+  priority: 4
+  size: 6070
+  mtime: '2026-04-25'
+  summary: 01 量化交易与 WorldQuant BRAIN 平台概述
+- path: docs/04_模拟设置详解.md
+  title: 04 模拟设置详解
+  applies_to_modes:
+  - '*'
+  tags:
+  - reference
+  scope: global
+  priority: 4
+  size: 7953
+  mtime: '2026-04-25'
+  summary: 04 模拟设置详解
+- path: docs/08_API接口与自动化脚本.md
+  title: 08 API接口与自动化脚本
+  applies_to_modes:
+  - '*'
+  tags:
+  - reference
+  scope: global
+  priority: 4
+  size: 17876
+  mtime: '2026-04-25'
+  summary: 08 API 接口与自动化脚本
+- path: docs/09_学习路径与Challenge得分指南.md
+  title: 09 学习路径与Challenge得分指南
+  applies_to_modes:
+  - '*'
+  tags:
+  - reference
+  scope: global
+  priority: 4
+  size: 7128
+  mtime: '2026-04-25'
+  summary: 09 学习路径与 Challenge 得分指南
+- path: docs/10_实战Alpha测试报告.md
+  title: 10 实战Alpha测试报告
+  applies_to_modes:
+  - '*'
+  tags:
+  - reference
+  scope: global
+  priority: 4
+  size: 12172
+  mtime: '2026-04-25'
+  summary: 实战Alpha测试报告 — 10个Alpha完整分析
+- path: docs/12_community_insights_and_alpha_experience.md
+  title: Community wisdom + experience notes
+  applies_to_modes:
+  - explore
+  - track_news
+  tags:
+  - community
+  - experience
+  scope: global
+  priority: 4
+  size: 32987
+  mtime: '2026-04-25'
+  summary: 12 社区洞察与实战经验总结
+- path: docs/architecture/AGENT_INTERFACE.md
+  title: AGENT INTERFACE
+  applies_to_modes:
+  - '*'
+  tags:
+  - architecture
+  - reference
+  scope: global
+  priority: 4
+  size: 9776
+  mtime: '2026-04-26'
+  summary: AGENT_INTERFACE — Agent 协议、Task 包、Workspace 规则
+- path: docs/architecture/AI_DISPATCHER.md
+  title: AI DISPATCHER
+  applies_to_modes:
+  - '*'
+  tags:
+  - architecture
+  - reference
+  scope: global
+  priority: 4
+  size: 10459
+  mtime: '2026-04-26'
+  summary: AI_DISPATCHER — AI 调用中间层
+- path: docs/architecture/BUS_ARCHITECTURE.md
+  title: BUS ARCHITECTURE
+  applies_to_modes:
+  - '*'
+  tags:
+  - architecture
+  - reference
+  scope: global
+  priority: 4
+  size: 7012
+  mtime: '2026-04-26'
+  summary: BUS_ARCHITECTURE — 总线核心（重写 v2）
+- path: docs/architecture/BUS_ARCHITECTURE_legacy.md
+  title: BUS ARCHITECTURE legacy
+  applies_to_modes:
+  - '*'
+  tags:
+  - architecture
+  - reference
+  scope: global
+  priority: 4
+  size: 5715
+  mtime: '2026-04-26'
+  summary: wq-bus 架构总览
+- path: docs/architecture/EVENT_CATALOG.md
+  title: EVENT CATALOG
+  applies_to_modes:
+  - '*'
+  tags:
+  - architecture
+  - reference
+  scope: global
+  priority: 4
+  size: 5370
+  mtime: '2026-04-26'
+  summary: EVENT_CATALOG — 总线事件目录
+- path: docs/architecture/EXPORT_FORMATS.md
+  title: EXPORT FORMATS
+  applies_to_modes:
+  - '*'
+  tags:
+  - architecture
+  - reference
+  scope: global
+  priority: 4
+  size: 4887
+  mtime: '2026-04-26'
+  summary: EXPORT_FORMATS — JSON 导出与日志规范
+- path: docs/architecture/SIMULATION_POOL.md
+  title: SIMULATION POOL
+  applies_to_modes:
+  - '*'
+  tags:
+  - architecture
+  - reference
+  scope: global
+  priority: 4
+  size: 7425
+  mtime: '2026-04-26'
+  summary: SIMULATION_POOL — 维度 / 方向 / 模拟池模型
+- path: docs/architecture/TRACE_AS_TASK.md
+  title: TRACE AS TASK
+  applies_to_modes:
+  - '*'
+  tags:
+  - architecture
+  - reference
+  scope: global
+  priority: 4
+  size: 4866
+  mtime: '2026-04-26'
+  summary: TRACE_AS_TASK — Trace 作为通用 Task 容器
+- path: docs/plan_phase2.md
+  title: plan phase2
+  applies_to_modes:
+  - '*'
+  tags:
+  - reference
+  scope: global
+  priority: 4
+  size: 7834
+  mtime: '2026-04-26'
+  summary: Phase 2 Plan — Polish, Recipe Synthesis, Real Run
+- path: docs/plan_v3.md
+  title: plan v3
+  applies_to_modes:
+  - '*'
+  tags:
+  - reference
+  scope: global
+  priority: 4
+  size: 23379
+  mtime: '2026-04-26'
+  summary: wq-bus 重构 — 整合后的设计与改造计划 (v3)
+- path: memory/{tag}/context_index.json
+  title: context index
+  applies_to_modes:
+  - '*'
+  tags:
+  - runtime
+  scope: per_tag
+  priority: 4
+  size: 203
+  mtime: '2026-04-28'
+  summary: 'json keys: dataset_tag,as_of,pool_summary,recent_learnings,recent_crawl_summaries,recent_failures'
+- path: memory/{tag}/crawl_index.json
+  title: crawl index
+  applies_to_modes:
+  - '*'
+  tags:
+  - runtime
+  scope: per_tag
+  priority: 4
+  size: 18923
+  mtime: '2026-04-25'
+  summary: 'json keys: generated,total_pages,entries'
+- path: memory/{tag}/ctx_alpha_gen.json
+  title: ctx alpha gen
+  applies_to_modes:
+  - '*'
+  tags:
+  - runtime
+  scope: per_tag
+  priority: 4
+  size: 21365
+  mtime: '2026-04-25'
+  summary: 'json keys: kb_stats,fail_reasons_7d,best_categories,worst_categories,saturated_sources,avoid_self_corr_sources'
+- path: memory/{tag}/ctx_failure_analyzer.json
+  title: ctx failure analyzer
+  applies_to_modes:
+  - '*'
+  tags:
+  - failure
+  - runtime
+  scope: per_tag
+  priority: 4
+  size: 32267
+  mtime: '2026-04-25'
+  summary: 'json keys: failed_alphas_recent,near_miss_alphas,dataset_settings,current_fail_counts,_meta'
+- path: memory/{tag}/submission_queue.json
+  title: submission queue
+  applies_to_modes:
+  - '*'
+  tags:
+  - runtime
+  scope: per_tag
+  priority: 4
+  size: 63985
+  mtime: '2026-04-25'
+  summary: Qualifying alphas not yet submitted. Consumed daily by daily_workflow.py.
+- path: memory/iteration_notes.md
+  title: Cross-session iteration log (R5 notes)
+  applies_to_modes:
+  - '*'
+  tags:
+  - meta
+  - history
+  scope: global
+  priority: 5
+  size: 40372
+  mtime: '2026-04-28'
+  summary: 迭代过程问题简要总结

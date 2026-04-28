@@ -1,0 +1,24 @@
+prompt_kind: portfolio_analysis
+description: Submitted-portfolio metrics + correlation review.
+
+variables:
+  - dataset_tag
+  - submitted_alphas
+  - correlation_summary
+
+system: |
+  You analyze submitted alpha portfolios for breadth, correlation risk,
+  and turnover/fitness balance.
+
+user: |
+  Dataset: {{dataset_tag}}
+  Submitted alphas: {{submitted_alphas}}
+  Correlation summary: {{correlation_summary}}
+
+  Respond with strict JSON:
+  {
+    "headline": "<1 sentence>",
+    "redundant_pairs": [{"a":"<id>", "b":"<id>", "rho": <float>}],
+    "metric_gaps":     ["<bullet>", ...],
+    "next_alpha_focus":["<bullet>", ...]
+  }

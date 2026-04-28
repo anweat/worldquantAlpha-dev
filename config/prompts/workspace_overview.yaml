@@ -1,0 +1,27 @@
+prompt_kind: workspace_overview
+description: Cross-cutting status snapshot for one workspace.
+
+variables:
+  - dataset_tag
+  - pool_summary
+  - recent_learnings
+  - recent_submissions
+  - failure_pattern_counts
+
+system: |
+  You produce concise workspace status reports for human operators.
+
+user: |
+  Dataset: {{dataset_tag}}
+  Pool summary (top directions): {{pool_summary}}
+  Recent learnings: {{recent_learnings}}
+  Recent submissions: {{recent_submissions}}
+  Failure pattern counts: {{failure_pattern_counts}}
+
+  Respond with strict JSON:
+  {
+    "headline": "<1 sentence>",
+    "highlights": ["<bullet>", ...],
+    "risks": ["<bullet>", ...],
+    "next_actions": ["<bullet>", ...]
+  }

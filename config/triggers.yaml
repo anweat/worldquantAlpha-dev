@@ -29,7 +29,7 @@ block_when_in_flight: true
 in_flight_soft_cap: 0    # ignored when block_when_in_flight=true; >0 caps concurrent rounds when false
 
 # Daily AI call cap (auto-triggered only; manual CLI exempt)
-daily_ai_cap: 80
+daily_ai_cap: 200
 
 # Max tasks triggered per single watchdog round
 per_round_cap: 12

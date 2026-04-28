@@ -10,8 +10,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 
-def _utcnow_iso() -> str:
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+from wq_bus.utils.timeutil import utcnow_iso as _utcnow_iso  # noqa: E402
 
 
 # Global registry: topic_name -> metadata dict

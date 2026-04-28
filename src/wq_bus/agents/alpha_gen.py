@@ -14,6 +14,7 @@ For each request:
 """
 from __future__ import annotations
 
+import asyncio
 from pathlib import Path
 from typing import ClassVar
 
@@ -23,7 +24,7 @@ from wq_bus.bus.events import Event, Topic, make_event
 from wq_bus.data import knowledge_db
 from wq_bus.utils.tag_context import require_tag
 
-PROJECT_ROOT = Path(__file__).resolve().parents[3]
+from wq_bus.utils.paths import PROJECT_ROOT  # noqa: E402
 MEMORY_DIR = PROJECT_ROOT / "memory"
 DATA_DIR = PROJECT_ROOT / "data"
 
@@ -94,6 +95,15 @@ class AlphaGen(AgentBase):
     def __init__(self, bus, dispatcher) -> None:
         super().__init__(bus, dispatcher)
         self._cached_summaries: list[str] = []
+        # Programmatic-expansion factor: each AI seed is mutated into K
+        # parameter-swept variants (windows + neutralization + decay +
+        # truncation). Loaded from config/alpha_gen.yaml; default 4 → 15
+        # AI seeds become ~60 simulator candidates per round.
+        try:
+            from wq_bus.utils.yaml_loader import load_yaml
+            self._cfg = load_yaml("alpha_gen") or {}
+        except Exception:
+            self._cfg = {}
 
     async def on_knowledge_updated(self, event: Event) -> None:
         self._cached_summaries.clear()
@@ -111,73 +121,250 @@ class AlphaGen(AgentBase):
 
         context = self._build_context(tag, hint, mode)
 
-        # Build task package — MUST NOT include strength or model
-        task_payload = {
-            "context": context,
-            "hint": hint,
-            "n_requested": n,
-            "mode": mode,
-        }
-        # Guard: assert no forbidden fields
-        for bad_field in ("strength", "model"):
-            assert bad_field not in task_payload, (
-                f"alpha_gen MUST NOT write {bad_field!r} in task payload"
-            )
+        # ── Mode budget for the fragment + combiner pipeline ───────────────
+        # Falls back to legacy "ask AI for n complete alphas" if no
+        # mode_budgets entry exists for this mode.
+        mode_budgets = (self._cfg.get("mode_budgets") or {})
+        mode_cfg = mode_budgets.get(mode) or {}
+        use_fragments = bool(mode_cfg)
 
-        try:
-            r = await self.call_ai(task_payload)
-        except Exception as e:
-            self.log.warning("alpha gen failed mode=%s: %s", mode, e)
+        # ── Pick prompt + build vars ───────────────────────────────────────
+        if use_fragments:
+            prompt_kind = "alpha_gen.fragments"
+            prompt_vars = {
+                "dataset_tag":      tag,
+                "mode":             mode,
+                "n_signals":        int(mode_cfg.get("n_signals", 8)),
+                "n_filters":        int(mode_cfg.get("n_filters", 3)),
+                "n_weights":        int(mode_cfg.get("n_weights", 2)),
+                "top_directions":   context.get("top_submitted", []),
+                "recent_failures":  context.get("recent_failures",
+                                                context.get("recent_learnings", [])),
+                "recent_summaries": context.get("crawl_summaries", []),
+                "available_docs":   context.get("available_docs", ""),
+            }
+        else:
+            prompt_kind = "alpha_gen.repair" if mode == "review_failure" else "alpha_gen.explore"
+            if prompt_kind == "alpha_gen.repair":
+                mut_tasks = (context.get("mutation_tasks")
+                             or context.get("failure_mutations")
+                             or [])
+                prompt_vars = {
+                    "dataset_tag":     tag,
+                    "n":               n,
+                    "mutation_tasks":  mut_tasks,
+                    "top_directions":  context.get("top_submitted", []),
+                    "available_docs":  context.get("available_docs", ""),
+                }
+            else:
+                prompt_vars = {
+                    "dataset_tag":      tag,
+                    "n":                n,
+                    "top_directions":   context.get("top_submitted", []),
+                    "recent_failures":  context.get("recent_failures",
+                                                    context.get("recent_learnings", [])),
+                    "recent_summaries": context.get("crawl_summaries", []),
+                    "available_docs":   context.get("available_docs", ""),
+                }
+
+        # b1: one retry with backoff for transient AI failures
+        r = None
+        last_exc: Exception | None = None
+        for attempt in range(1, 3):
+            try:
+                r = await self.ai_request(prompt_kind, prompt_vars, timeout=300)
+                if r is not None:
+                    break
+                # ai_request returned None on timeout/AI_CALL_FAILED — treat as
+                # transient and retry once.
+                last_exc = RuntimeError("ai_request returned None")
+            except Exception as e:
+                last_exc = e
+                self.log.warning("alpha gen attempt %d/2 failed mode=%s: %s", attempt, mode, e)
+            if attempt < 2:
+                await asyncio.sleep(2.0 if attempt == 1 else 8.0)
+
+        # ── Fallback: if fragments prompt failed/empty, retry legacy explore ──
+        # Reasoning: the combiner depends on at least 1 signal; if AI returns
+        # empty fragments we don't want a wasted round. Legacy alpha_gen.explore
+        # has years of prompt tuning and is a safe net.
+        used_fallback = False
+        if use_fragments:
+            from wq_bus.agents.alpha_combiner import parse_ai_response as _parse_frags
+            ai_call_id_top0 = r.get("_ai_call_id") if isinstance(r, dict) else None
+            preview_frags = _parse_frags(r, ai_call_id=ai_call_id_top0) if r else None
+            need_fallback = (r is None) or (preview_frags is None) or (not preview_frags.signals)
+            if need_fallback:
+                self.log.warning(
+                    "alpha_gen.fragments produced no signals — falling back to alpha_gen.explore"
+                )
+                fb_kind = "alpha_gen.explore"
+                fb_vars = {
+                    "dataset_tag":      tag,
+                    "n":                int(mode_cfg.get("n_signals", n) or n),
+                    "top_directions":   context.get("top_submitted", []),
+                    "recent_failures":  context.get("recent_failures",
+                                                    context.get("recent_learnings", [])),
+                    "recent_summaries": context.get("crawl_summaries", []),
+                }
+                try:
+                    r = await self.ai_request(fb_kind, fb_vars, timeout=300)
+                    used_fallback = True
+                except Exception as e:
+                    last_exc = e
+                    r = None
+
+        if r is None:
+            # b3: emit dedicated error event so trace can close cleanly
+            try:
+                from wq_bus.bus.events import make_event as _mk
+                self.bus.emit(_mk("ALPHA_GEN_ERRORED", tag,
+                                  reason=f"{type(last_exc).__name__}: {last_exc}",
+                                  attempts=2))
+            except Exception:
+                self.log.exception("failed to emit ALPHA_GEN_ERRORED")
             return
 
-        # Accept either {"expressions": [{...}, ...]} or single {"expression": "..."}
-        items: list[dict]
-        if isinstance(r, dict) and isinstance(r.get("expressions"), list):
-            items = r["expressions"]
-        elif isinstance(r, dict) and r.get("expression"):
-            items = [r]
+        # ── Build seeds: either via combiner (fragments) or legacy direct ──
+        ai_call_id_top = r.get("_ai_call_id") if isinstance(r, dict) else None
+        seeds: list[tuple[str, dict, str | None, str]] = []
+
+        if use_fragments and not used_fallback:
+            from wq_bus.agents.alpha_combiner import (
+                combine as _combine, parse_ai_response as _parse_frags,
+            )
+            frags = _parse_frags(r, ai_call_id=ai_call_id_top)
+            combined = _combine(frags, mode_cfg)
+            self.log.info(
+                "alpha_combiner: signals=%d filters=%d weights=%d → combined=%d "
+                "(strategies=%s)",
+                len(frags.signals), len(frags.filters), len(frags.weights),
+                len(combined),
+                mode_cfg.get("enabled_strategies") or "<all>",
+            )
+            for ca in combined:
+                seeds.append((
+                    ca.expr,
+                    ca.settings or {},
+                    ca.provenance.get("ai_call_id") or ai_call_id_top,
+                    f"[{ca.provenance.get('strategy','combo')}] "
+                    f"{ca.provenance.get('rationale','')}".strip(),
+                ))
         else:
-            items = []
+            # Legacy / fallback path
+            items: list[dict]
+            if isinstance(r, dict) and isinstance(r.get("alphas"), list):
+                items = r["alphas"]
+            elif isinstance(r, dict) and isinstance(r.get("expressions"), list):
+                items = r["expressions"]
+            elif isinstance(r, dict) and r.get("expression"):
+                items = [r]
+            else:
+                items = []
+            for item in items[:max(n, int(mode_cfg.get("n_signals", n) or n))]:
+                expr = (item or {}).get("expression", "").strip()
+                if not expr:
+                    continue
+                seeds.append((
+                    expr,
+                    (item or {}).get("settings_overrides") or {},
+                    item.get("_ai_call_id") or ai_call_id_top,
+                    (item or {}).get("rationale", ""),
+                ))
 
         n_emitted = 0
-        for item in items[:n]:
-            expr = (item or {}).get("expression", "").strip()
-            if not expr:
+        import uuid as _uuid
+        batch_id = _uuid.uuid4().hex[:8]
+        # Programmatic expansion (post-combiner): each seed → K variants by
+        # perturbing ts_* windows + simulator settings.
+        from wq_bus.agents.alpha_mutator import expand_batch
+        expansion_factor = max(1, int(
+            mode_cfg.get("expansion_factor",
+                         self._cfg.get("expansion_factor", 4))
+        ))
+        # Expand: list of (expr, settings, parent_idx)
+        expanded = expand_batch(
+            [(s[0], s[1]) for s in seeds],
+            factor=expansion_factor,
+        )
+        # First pass: filter out duplicates / blanks so batch_total reflects what
+        # sim_executor will actually see. Without this the BATCH_DONE counter would
+        # never converge when N items collapse via dedup.
+        prepared: list[tuple[str, str, dict, str | None, str]] = []
+        for v_expr, v_settings, parent_idx in expanded:
+            if not v_expr:
                 continue
-            if is_duplicate(expr):
-                self.log.debug("dedup skip: %s", expr[:80])
+            if is_duplicate(v_expr):
+                self.log.debug("dedup skip: %s", v_expr[:80])
                 continue
-            fp_hash, _ = fingerprint(expr)
-            record(expr)
+            fp_hash, _ = fingerprint(v_expr)
+            record(v_expr)
+            _, _, p_aicid, p_rationale = seeds[parent_idx]
+            # Mark variants (parent_idx>0 within seed → variant) in rationale
+            rationale = p_rationale if v_expr == seeds[parent_idx][0] and v_settings == seeds[parent_idx][1] \
+                                    else f"[variant] {p_rationale}"
+            prepared.append((v_expr, fp_hash, v_settings, p_aicid, rationale))
+        self.log.info(
+            "alpha_gen: mode=%s prompt=%s seeds=%d → expanded=%d → after_dedup=%d "
+            "(factor=%d, fallback=%s)",
+            mode, prompt_kind, len(seeds), len(expanded), len(prepared),
+            expansion_factor, used_fallback,
+        )
 
-            settings_overrides = (item or {}).get("settings_overrides") or {}
-            ai_call_id = item.get("_ai_call_id") or r.get("_ai_call_id")
+        batch_total = len(prepared)
+        if batch_total == 0:
+            # Nothing to draft this round — emit BATCH_DONE immediately so the
+            # coordinator's wait_for(BATCH_DONE) doesn't wedge until timeout.
+            try:
+                self.bus.emit(make_event(Topic.BATCH_DONE, tag,
+                                         batch_id=batch_id, n_total=0,
+                                         n_is_passed=0, n_sc_passed=0))
+            except Exception:
+                self.log.exception("empty BATCH_DONE emit failed")
+            self.log.info("alpha_gen emitted 0/%d drafts for %s mode=%s (1 AI call) — empty batch", n, tag, mode)
+            return
 
-            # --- Dimensions + recipes integration ---
+        for expr, fp_hash, settings_overrides, ai_call_id, rationale in prepared:
             direction_id, themes_csv = self._classify_and_register(
                 expr, settings_overrides, tag, mode, hint
             )
 
-            # Bump pool stats per-alpha against its own direction_id (plan §5.4)
             try:
                 from wq_bus.data import workspace
                 workspace.bump_stats(tag, direction_id, alphas_tried=1)
             except Exception as e:
                 self.log.debug("bump_stats(alphas_tried) failed for %s: %s", direction_id, e)
 
-            self.bus.emit(make_event(Topic.ALPHA_DRAFTED, tag,
-                                     expression=expr,
-                                     settings=settings_overrides,
-                                     fingerprint=fp_hash,
-                                     ai_call_id=ai_call_id,
-                                     rationale=(item or {}).get("rationale", ""),
-                                     direction_id=direction_id,
-                                     themes_csv=themes_csv,
-                                     mode=mode))
+            try:
+                self.bus.emit(make_event(Topic.ALPHA_DRAFTED, tag,
+                                         expression=expr,
+                                         settings=settings_overrides,
+                                         fingerprint=fp_hash,
+                                         ai_call_id=ai_call_id,
+                                         rationale=rationale,
+                                         direction_id=direction_id,
+                                         themes_csv=themes_csv,
+                                         mode=mode,
+                                         batch_id=batch_id,
+                                         batch_total=batch_total))
+            except Exception as e:
+                self.log.exception("ALPHA_DRAFTED emit failed; rolling back fingerprint: %s", e)
+                try:
+                    knowledge_db.delete_fingerprint(fp_hash)
+                except Exception:
+                    self.log.exception("fingerprint rollback failed for %s", fp_hash[:12])
+                # Decrement batch_total via a "skip" notification so sim_executor
+                # doesn't wait forever for an alpha that never made it to the bus.
+                try:
+                    self.bus.emit(make_event("ALPHA_DRAFT_SKIPPED", tag,
+                                             batch_id=batch_id, reason="emit_failed"))
+                except Exception:
+                    pass
+                continue
             n_emitted += 1
 
-        self.log.info("alpha_gen emitted %d/%d drafts for %s mode=%s (1 AI call)",
-                      n_emitted, n, tag, mode)
+        self.log.info("alpha_gen emitted %d/%d drafts for %s mode=%s batch=%s (1 AI call)",
+                      n_emitted, n, tag, mode, batch_id)
 
     # ------------------------------------------------------------------
     # Classification helpers
@@ -326,23 +513,19 @@ class AlphaGen(AgentBase):
             return []
 
     def _build_context(self, tag: str, hint: str, mode: str) -> dict:
-        """Build prompt context with mode-specific prefix."""
+        """Build prompt context with mode-specific prefix.
+
+        rev-h7: heavy lifting (top alphas / failures / recipes / portfolio /
+        crawl summaries / insights) is delegated to CuratedContext, which
+        scores by recency+quality, deduplicates by theme, and applies a
+        char-budget when the adapter bills per token. This module only adds
+        agent-local fields (mode_hint, hint, valid_fields, avoid_expressions,
+        and the specialize-mode top-directions block).
+        """
+        from wq_bus.ai.context_curator import CuratedContext
+
         mode_hint = _MODE_HINTS.get(mode, "")
-        learnings = knowledge_db.recent_learnings(limit=10)
-        top_alphas = knowledge_db.list_alphas(status="submitted", limit=5)
-        summaries = knowledge_db.recent_summaries(limit=3)
-        insights_path = MEMORY_DIR / tag / "insights.md"
-        insights = insights_path.read_text(encoding="utf-8") if insights_path.exists() else ""
-
-        # Pool context
-        pool_summary = []
-        try:
-            from wq_bus.data import workspace
-            pool_summary = workspace.list_directions(tag, limit=10)
-        except Exception:
-            pass
-
-        # Inject valid datafield ids so AI doesn't hallucinate field names
+        curated = CuratedContext(agent_type="alpha_gen", mode=mode, tag=tag).build()
         valid_fields = _load_valid_fields(tag)
 
         ctx: dict = {
@@ -350,14 +533,17 @@ class AlphaGen(AgentBase):
             "mode": mode,
             "mode_hint": mode_hint,
             "hint": hint,
-            "recent_learnings": [{"kind": l["kind"], "content": l["content"][:300]} for l in learnings],
-            "top_submitted": [{"expr": a["expression"][:120],
-                               "sharpe": a.get("sharpe"), "fitness": a.get("fitness")}
-                              for a in top_alphas],
-            "crawl_summaries": [s["summary_md"][:500] for s in summaries],
-            "insights_md": insights[:2000],
-            "pool_summary": pool_summary[:5],
-            "valid_fields": valid_fields,
+            # Curator outputs (legacy keys preserved so prompt template is unchanged)
+            "recent_learnings":     curated.get("recent_learnings", []),
+            "top_submitted":        curated.get("top_submitted", []),
+            "crawl_summaries":      curated.get("crawl_summaries", []),
+            "insights_md":          (curated.get("insights") or [""])[0] if curated.get("insights") else "",
+            "pool_summary":         curated.get("pool_summary", []),
+            "gap_directions":       curated.get("gap_directions", []),
+            "overcrowded_directions": curated.get("overcrowded_directions", []),
+            "portfolio_suggestions": curated.get("portfolio_suggestions", []),
+            "recipe_hints":         curated.get("recipe_hints", []),
+            "valid_fields":         valid_fields,
             "field_rule": (
                 "STRICT: Only use field ids from valid_fields. Common WQ price/volume "
                 "fields (close, open, high, low, volume, vwap, returns, adv20) and "
@@ -365,26 +551,20 @@ class AlphaGen(AgentBase):
                 "names like net_income/equity/cashflow_op — use only listed ids or the "
                 "common price/volume set."
             ),
+            "_curator_meta":        curated.get("_curator_meta", {}),
         }
 
-        # ---- Mode-specific context injection ----
-        # Universal: avoid recently-tried expression skeletons
+        # Universal: avoid recently-tried expression skeletons (agent-local;
+        # not in curator because skeleton scoring is dedupe-only, no quality).
         ctx["avoid_expressions"] = self._recent_fingerprints(tag, limit=30)
-        # Universal: portfolio insights (gap directions = explore, overcrowded = avoid)
-        pa = self._load_portfolio_analysis(tag)
-        if pa:
-            ctx["gap_directions"] = (pa.get("gap_directions") or [])[:8]
-            ctx["overcrowded_directions"] = (pa.get("overcrowded_directions") or [])[:8]
-            sugg = pa.get("suggestions") or []
-            ctx["portfolio_suggestions"] = [str(s)[:240] for s in sugg[:6]]
-        # Universal: approved recipe hints (status='approved' only — proposed never leaks)
-        ctx["recipe_hints"] = self._approved_recipe_hints(tag, k=6)
 
+        # Mode-specific add-ons that the curator does not own.
         if mode == "review_failure":
+            ctx["failure_patterns"] = curated.get("failure_patterns", [])
+            ctx["mutation_tasks"]   = curated.get("mutation_tasks", [])
+            # Keep summary text from the raw file (curator returns just the lists)
             fp_data = self._load_failure_patterns(tag)
-            ctx["failure_patterns"] = (fp_data.get("patterns") or [])[:10]
-            ctx["mutation_tasks"] = (fp_data.get("mutation_tasks") or [])[:10]
-            ctx["failure_summary"] = (fp_data.get("summary") or "")[:1000]
+            ctx["failure_summary"]  = (fp_data.get("summary") or "")[:1000]
 
         if mode == "specialize":
             ctx["top_directions"] = self._top_alphas_by_direction(tag, k=3)
@@ -400,5 +580,15 @@ class AlphaGen(AgentBase):
                 "Use crawl_summaries above to extract one current theme (earnings season / "
                 "macro shock / sector rotation) and craft N alphas that operationalize it."
             )
+
+        # ── Optional doc index (Copilot CLI sub-agent can `view` on demand) ──
+        # Best-effort: failures here must not break prompt rendering.
+        try:
+            from wq_bus.ai.doc_manifest import load_for_mode, render_for_prompt
+            doc_entries = load_for_mode(mode, dataset_tag=tag)
+            ctx["available_docs"] = render_for_prompt(doc_entries)
+        except Exception as e:
+            self.log.debug("doc_manifest load failed: %s", e)
+            ctx["available_docs"] = ""
 
         return ctx

@@ -27,7 +27,7 @@ from wq_bus.utils.logging import get_logger
 
 _log = get_logger(__name__)
 
-_PROJECT_ROOT = Path(__file__).resolve().parents[3]
+from wq_bus.utils.paths import PROJECT_ROOT as _PROJECT_ROOT  # noqa: E402
 _CACHE_ROOT = _PROJECT_ROOT / "data" / "ai_cache"
 _ARCHIVE_ROOT = _CACHE_ROOT / "archive"
 
@@ -35,8 +35,7 @@ Stage = Literal["queued", "sent", "received", "unpacked", "done", "failed"]
 VALID_STAGES: tuple[Stage, ...] = ("queued", "sent", "received", "unpacked", "done", "failed")
 
 
-def _utcnow_iso() -> str:
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+from wq_bus.utils.timeutil import utcnow_iso as _utcnow_iso  # noqa: E402
 
 
 def _new_package_id() -> str:

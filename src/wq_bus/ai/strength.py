@@ -21,8 +21,7 @@ StrengthLevel = str  # "high" | "medium" | "low" | "n/a"
 VALID_STRENGTHS = {"high", "medium", "low", "n/a"}
 
 
-def _utcnow_iso() -> str:
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+from wq_bus.utils.timeutil import utcnow_iso as _utcnow_iso  # noqa: E402
 
 
 class StrengthRouter:

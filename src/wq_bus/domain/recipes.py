@@ -21,8 +21,7 @@ from wq_bus.utils.logging import get_logger
 _log = get_logger(__name__)
 
 
-def _utcnow_iso() -> str:
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+from wq_bus.utils.timeutil import utcnow_iso as _utcnow_iso  # noqa: E402
 
 
 # ---------------------------------------------------------------------------

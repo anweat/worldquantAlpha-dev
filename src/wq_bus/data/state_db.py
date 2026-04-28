@@ -5,23 +5,45 @@ import json
 import time
 from typing import Any, Iterable, Optional
 
+from wq_bus.bus import topic_meta
 from wq_bus.data._sqlite import open_state
-from wq_bus.utils.tag_context import require_tag
+from wq_bus.utils.tag_context import require_tag, get_tag
+from wq_bus.utils.timeutil import today_start_ts_utc
 
 
 # ---------- events ----------
 
 def record_event(topic: str, payload: dict, *, dataset_tag: Optional[str] = None,
                  trace_id: Optional[str] = None) -> int:
-    tag = dataset_tag or require_tag()
+    """Persist a critical event row.
+
+    ``dataset_tag`` may be ``None`` / ``"_global"`` for cross-cutting events
+    that don't belong to any single dataset. The (workspace_scope, topic_subspace)
+    pair is auto-resolved from the ``config/topics.yaml`` registry so the
+    summarizer / curator can query by subindex.
+    """
+    tag = dataset_tag or get_tag() or "_global"
     if trace_id is None:
         from wq_bus.utils.tag_context import get_trace_id
         trace_id = get_trace_id()
+    workspace_scope, topic_subspace = topic_meta.resolve_scope(topic, tag)
+    payload_json = json.dumps(payload, ensure_ascii=False, default=str)
     with open_state() as conn:
-        cur = conn.execute(
-            "INSERT INTO events (ts, topic, dataset_tag, payload_json, trace_id) VALUES (?, ?, ?, ?, ?)",
-            (time.time(), topic, tag, json.dumps(payload, ensure_ascii=False, default=str), trace_id),
-        )
+        # Best-effort: if the topic_subspace columns are missing (very old DB
+        # before migration 010 ran) fall back to the legacy 5-column INSERT.
+        try:
+            cur = conn.execute(
+                "INSERT INTO events (ts, topic, dataset_tag, payload_json, trace_id, "
+                "topic_subspace, workspace_scope) VALUES (?,?,?,?,?,?,?)",
+                (time.time(), topic, tag, payload_json, trace_id,
+                 topic_subspace, workspace_scope),
+            )
+        except Exception:
+            cur = conn.execute(
+                "INSERT INTO events (ts, topic, dataset_tag, payload_json, trace_id) "
+                "VALUES (?,?,?,?,?)",
+                (time.time(), topic, tag, payload_json, trace_id),
+            )
         return cur.lastrowid
 
 
@@ -58,6 +80,12 @@ def enqueue_submission(
     Uses ON CONFLICT … DO UPDATE so re-enqueuing an existing item
     preserves ``retry_count`` (previously INSERT OR REPLACE reset it,
     making the dead-letter escalation logic unreliable).
+
+    G2: WHERE clause on ON CONFLICT prevents reviving items already in
+    ``dead_letter``. Once an alpha has exhausted ``max_retries``, callers
+    must use ``requeue_alpha(reset_retry=True)`` to consciously re-enable
+    it; an automatic re-enqueue (e.g. duplicate IS_PASSED) is silently
+    ignored, leaving the dead-letter row intact for audit.
     """
     tag = require_tag()
     if trace_id is None:
@@ -78,6 +106,7 @@ def enqueue_submission(
                  updated_at=excluded.updated_at,
                  note=excluded.note,
                  trace_id=COALESCE(excluded.trace_id, submission_queue.trace_id)
+               WHERE submission_queue.status != 'dead_letter'
                """,
             (alpha_id, tag, priority,
              json.dumps(is_metrics) if is_metrics else None,
@@ -143,13 +172,15 @@ def queue_size(status: str = "pending") -> int:
 
 
 def count_submitted_today() -> int:
-    """How many alphas have status='submitted' with updated_at in the last 24h.
+    """How many alphas have status='submitted' since 00:00:00 UTC today.
 
-    Used by the submitter to enforce ``daily_max`` from submission.yaml across
-    process restarts (the in-memory n_submitted counter resets per flush).
+    G1: previously used ``time.time() - 86400`` which slid the window with
+    the query moment and was vulnerable to NTP step-back. Anchoring on
+    UTC midnight gives a stable per-calendar-day count that matches the
+    ``daily_max`` semantics in submission.yaml.
     """
     tag = require_tag()
-    cutoff = time.time() - 86400
+    cutoff = today_start_ts_utc()
     with open_state() as conn:
         row = conn.execute(
             """SELECT COUNT(*) AS n FROM submission_queue
@@ -239,6 +270,8 @@ def record_ai_call(
     adapter: str | None = None,
     package_id: str | None = None,
     source: str = "auto",
+    call_id: str | None = None,
+    prompt_kind: str | None = None,
 ) -> int:
     """Record one AI call. Returns the inserted row id (used to link alphas back).
 
@@ -262,24 +295,27 @@ def record_ai_call(
                (ts, dataset_tag, agent_type, model, depth, provider, n_packed,
                 tokens_in, tokens_out, cost_usd, duration_ms, success, error,
                 trace_id, prompt_text, response_text,
-                strength, mode, adapter, package_id, source)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                strength, mode, adapter, package_id, source,
+                call_id, prompt_kind)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (time.time(), tag, agent_type, model, depth, provider, n_packed,
              tokens_in, tokens_out, cost_usd, duration_ms, 1 if success else 0, error,
              trace_id, prompt_text, response_text,
-             strength, mode, adapter, package_id, source),
+             strength, mode, adapter, package_id, source,
+             call_id, prompt_kind),
         )
         return cur.lastrowid
 
 
 def count_ai_calls_today(*, agent_type: str | None = None,
                          source: str | None = None) -> int:
-    """Count AI calls in the last 24h. Used by RateLimiter for daily cap.
+    """Count AI calls since 00:00:00 UTC today. Used by RateLimiter daily cap.
 
-    Pass ``source='auto'`` to exclude manual calls from the count (so manual
-    invocations don't eat the daily auto budget).
+    G1: anchored on UTC midnight (was ``time.time() - 86400``) so the count
+    is stable within a calendar day and immune to small NTP corrections.
+    Pass ``source='auto'`` to exclude manual calls from the budget.
     """
-    cutoff = time.time() - 86400
+    cutoff = today_start_ts_utc()
     sql = "SELECT COUNT(*) AS n FROM ai_calls WHERE ts >= ?"
     params: list = [cutoff]
     if agent_type:
@@ -310,3 +346,49 @@ def acquire_lock(name: str, holder: str, ttl_seconds: float = 300) -> bool:
 def release_lock(name: str, holder: str) -> None:
     with open_state() as conn:
         conn.execute("DELETE FROM locks WHERE name=? AND holder=?", (name, holder))
+
+
+# ---------- sim_dead_letter (Round-5 c2/C1) ----------
+
+def add_sim_dead_letter(*, expression: str, reason: str,
+                        settings: Optional[dict] = None,
+                        trace_id: Optional[str] = None,
+                        attempts: int = 1) -> int:
+    """Record an unrecoverable simulation failure for offline triage.
+
+    Returns the new row id. Caller must be inside a `with_tag(...)` context.
+    """
+    tag = require_tag()
+    if trace_id is None:
+        from wq_bus.utils.tag_context import get_trace_id
+        trace_id = get_trace_id()
+    with open_state() as conn:
+        cur = conn.execute(
+            """INSERT INTO sim_dead_letter
+               (dataset_tag, expression, settings_json, reason, trace_id, attempts, created_at)
+               VALUES (?,?,?,?,?,?,?)""",
+            (tag, expression, json.dumps(settings or {}), reason, trace_id,
+             int(attempts), time.time()),
+        )
+        return cur.lastrowid
+
+
+def list_sim_dead_letter(*, limit: int = 50) -> list[dict]:
+    tag = require_tag()
+    with open_state() as conn:
+        rows = conn.execute(
+            """SELECT * FROM sim_dead_letter WHERE dataset_tag=? AND requeued_at IS NULL
+               ORDER BY created_at DESC LIMIT ?""",
+            (tag, int(limit)),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def mark_sim_dlq_requeued(row_id: int) -> bool:
+    tag = require_tag()
+    with open_state() as conn:
+        cur = conn.execute(
+            "UPDATE sim_dead_letter SET requeued_at=? WHERE id=? AND dataset_tag=? AND requeued_at IS NULL",
+            (time.time(), int(row_id), tag),
+        )
+        return cur.rowcount > 0

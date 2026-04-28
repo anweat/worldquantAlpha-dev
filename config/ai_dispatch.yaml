@@ -1,14 +1,15 @@
 rate_limits:
   # Phase 2 T2 real-run budget — adjust back after.
-  daily_cap_total: 80
+  daily_cap_total: 200
   daily_cap_per_agent:
-    alpha_gen: 30          # generation is the workhorse for T2
-    failure_analyzer: 10
-    doc_summarizer: 12
-    portfolio_analyzer: 4
-    crawler_intent: 6
+    alpha_gen: 80          # generation is the workhorse for T2
+    failure_analyzer: 25
+    doc_summarizer: 25
+    portfolio_analyzer: 10
+    crawler_intent: 15
+    summarizer: 30
   per_round_cap_per_agent:
-    alpha_gen: 4           # allow 4 gen calls per round (one per dimension batch)
+    alpha_gen: 8           # fragments pipeline needs ~3 fragment + 1 explore + headroom
     failure_analyzer: 2
     doc_summarizer: 3
 batching:
@@ -17,10 +18,22 @@ batching:
 adapters:
   copilot:
     binary: copilot
-    timeout_secs: 120
+    timeout_secs: 300
   openai:
     base_url_env: OPENAI_BASE_URL
     key_env: OPENAI_API_KEY
   glm:
     base_url_env: WQBUS_GLM_BASE
     key_env: WQBUS_GLM_API_KEY
+
+# ---------------------------------------------------------------------------
+# Adapter fallbacks — when a preferred model is rejected (entitlement / network
+# down for premium tunnel), dispatcher auto-retries once with this model.
+# Premium models (claude-sonnet-4.6 / opus-4.7) require a system tunnel; if
+# the user runs the daemon without one, we silently fall back to gpt-5.4 which
+# is universally available on Copilot CLI.
+# ---------------------------------------------------------------------------
+adapter_fallbacks:
+  copilot_cli:
+    on_model_unavailable: gpt-5.4
+

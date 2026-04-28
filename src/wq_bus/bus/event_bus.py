@@ -27,10 +27,27 @@ Handler = Callable[[Event], Awaitable[None]]
 
 
 class EventBus:
+    # Soft cap on in-flight background tasks; emits a one-shot warning when
+    # exceeded so runaway emit rates surface in logs instead of OOMing silently.
+    _MAX_INFLIGHT_TASKS = 1000
+
     def __init__(self) -> None:
         self._handlers: dict[str, list[Handler]] = defaultdict(list)
         self._tasks: set[asyncio.Task] = set()
         self._mirror_enabled: bool = True
+        self._tasks_overflow_warned: bool = False
+        # Optional: when set, emit() called from a non-loop thread will use
+        # run_coroutine_threadsafe to schedule handlers on this loop. Set by
+        # daemon at startup so the embedded web HTTP thread can emit safely.
+        self._main_loop: asyncio.AbstractEventLoop | None = None
+
+    def bind_main_loop(self, loop: asyncio.AbstractEventLoop | None) -> None:
+        """Bind the long-lived daemon loop. Allows cross-thread emit().
+
+        Call from inside the daemon's loop with `asyncio.get_running_loop()`.
+        Pass None to clear (e.g., on shutdown). Idempotent.
+        """
+        self._main_loop = loop
 
     # ------------------------------------------------------------------
     # subscription
@@ -67,15 +84,33 @@ class EventBus:
             )
             self._maybe_close_trace_safe(event)
         try:
-            task = asyncio.create_task(_run_then_close())
-        except RuntimeError as exc:
-            # Event loop closed/closing — no point scheduling. Run terminal
-            # closure synchronously so the trace doesn't leak as 'running'.
-            log.warning("emit(%s): event loop unavailable (%s); skipping handlers", event.topic, exc)
+            running = asyncio.get_running_loop()
+        except RuntimeError:
+            running = None
+        if running is None:
+            # No loop in this thread. If a main loop has been bound (daemon
+            # mode with embedded web), schedule onto it cross-thread.
+            if self._main_loop is not None and not self._main_loop.is_closed():
+                try:
+                    fut = asyncio.run_coroutine_threadsafe(_run_then_close(), self._main_loop)
+                    fut.add_done_callback(lambda _f: None)
+                    return
+                except Exception as e2:  # noqa: BLE001
+                    log.warning("emit(%s): cross-thread schedule failed (%s)", event.topic, e2)
+            log.warning("emit(%s): event loop unavailable; skipping handlers", event.topic)
             self._maybe_close_trace_safe(event)
             return
+        task = asyncio.create_task(_run_then_close())
         self._tasks.add(task)
         task.add_done_callback(self._tasks.discard)
+        if len(self._tasks) > self._MAX_INFLIGHT_TASKS and not self._tasks_overflow_warned:
+            log.warning(
+                "EventBus._tasks overflow (>%d in flight) — possible runaway emit loop",
+                self._MAX_INFLIGHT_TASKS,
+            )
+            self._tasks_overflow_warned = True
+        elif len(self._tasks) <= self._MAX_INFLIGHT_TASKS // 2:
+            self._tasks_overflow_warned = False
 
     async def emit_and_wait(self, event: Event) -> None:
         """Await all handlers. Exceptions are logged, not re-raised."""
@@ -209,6 +244,8 @@ class EventBus:
                     (trace_id,),
                 ).fetchone()
         except Exception:
+            # Surface DB read failure: silent return left traces 'running' forever.
+            log.exception("_maybe_close_trace: DB read failed for trace_id=%s", trace_id)
             return
         if not row or row["status"] != "running":
             return
@@ -258,6 +295,7 @@ def get_bus() -> EventBus:
     global _bus
     if _bus is None:
         _bus = EventBus()
+        _install_control_handlers(_bus)
     return _bus
 
 
@@ -265,3 +303,33 @@ def reset_bus() -> None:
     """Test helper."""
     global _bus
     _bus = None
+
+
+def _install_control_handlers(bus: "EventBus") -> None:
+    """Subscribe trace control topics: cancel/pause/resume.
+
+    Called once at bus creation time. Handlers are bus-internal (not agents)
+    so they fire even if no agent is attached and they don't need to live
+    on the trace's task_kind.
+    """
+    async def _on_cancel(event: Event) -> None:
+        from wq_bus.bus.tasks import cancel_task
+        tid = event.payload.get("trace_id") or getattr(event, "trace_id", None)
+        if tid:
+            cancel_task(tid, reason=event.payload.get("reason", "user_cancel"))
+
+    async def _on_pause(event: Event) -> None:
+        from wq_bus.bus.tasks import pause_task
+        tid = event.payload.get("trace_id") or getattr(event, "trace_id", None)
+        if tid:
+            pause_task(tid)
+
+    async def _on_resume(event: Event) -> None:
+        from wq_bus.bus.tasks import resume_task
+        tid = event.payload.get("trace_id") or getattr(event, "trace_id", None)
+        if tid:
+            resume_task(tid)
+
+    bus.subscribe("TASK_CANCEL_REQUESTED", _on_cancel)
+    bus.subscribe("TASK_PAUSE_REQUESTED",  _on_pause)
+    bus.subscribe("TASK_RESUME_REQUESTED", _on_resume)

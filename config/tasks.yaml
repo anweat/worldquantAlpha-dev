@@ -1,0 +1,136 @@
+# Task & Pipeline registry — R6-C unified Coordinator config.
+#
+# Two-layer model:
+#   pipelines.<NAME>  = a single trace's step recipe (DAG of agent emits + waits)
+#   tasks.<NAME>      = a goal-oriented session that drives one pipeline in a loop
+#                        until goal_expression evaluates true (or caps fire)
+#
+# Goal expression grammar
+# -----------------------
+#   leaf:  { <counter>: { <op>: <value> } }
+#          op ∈ { ">=", ">", "<=", "<", "==", "!=" }
+#   and :  { and: [ expr, expr, ... ] }
+#   or  :  { or:  [ expr, expr, ... ] }
+#   not :  { not: expr }
+#
+# Built-in counters (auto-tracked from pipeline outcomes):
+#   iterations           — how many traces this task has spawned
+#   submitted_count      — # SUBMITTED events seen across all child traces
+#   is_passed_count      — # IS_PASSED events
+#   alphas_drafted       — # ALPHA_DRAFTED events
+#   soft_failures        — # TRACE_FAILED with kind=soft
+#   hard_failures        — # TRACE_FAILED with kind=hard
+#   wall_time_elapsed    — seconds since task start (set just before evaluation)
+#
+# Failure policy
+# --------------
+#   soft : reasons treated as recoverable (count++, continue spawning)
+#   hard : reasons that abort the task immediately (TASK_EXHAUSTED reason=hard_failure)
+#   abort_after_consecutive_soft : escalate to hard if N soft in a row
+#
+# Pipelines steps (each step runs *inside* a trace)
+# -------------------------------------------------
+#   id          (str, required) — unique within pipeline
+#   emit        (topic name)    — event the coordinator emits to kick the step
+#   payload     (dict)          — inline payload merged with task vars
+#   wait_for    (topic)         — single-event wait
+#   wait_for_any(list[topic])   — wait for first matching event
+#   collect_until (dict)        — { topic: <T>, count: <N>, timeout: <secs> }
+#                                 collect events until count or timeout
+#   timeout     (int secs, default 300)
+#   condition   (dict|str)      — optional precondition expression vs current state
+
+defaults:
+  failure_policy:
+    soft: [HTTP_429, RATE_LIMITED, BRAIN_503, NETWORK_TIMEOUT]
+    hard: [AI_FATAL, AUTH_FAILED, INVALID_CONFIG]
+    abort_after_consecutive_soft: 5
+  max_iterations: 20
+  wall_time_secs: 7200
+
+pipelines:
+
+  echo_pipeline:
+    description: "Single-step pipeline used by tests; immediately satisfies goal."
+    steps:
+      - id: echo
+        emit: PIPELINE_ECHO
+        timeout: 5
+
+  alpha_round:
+    description: "One full alpha generation iteration: gen → simulate → enqueue → submit"
+    steps:
+      - id: generate
+        emit: GENERATE_REQUESTED
+        payload: {n: 15, source: coordinator}
+        wait_for: BATCH_DONE
+        timeout: 900
+      - id: flush_submit
+        emit: QUEUE_FLUSH_REQUESTED
+        collect_until:
+          topic: SUBMITTED
+          count: 1
+          timeout: 180
+
+  failure_repair:
+    description: "Failure-batch summary → propose recipe → next alpha_round seeds it"
+    steps:
+      - id: summarize_failures
+        emit: FAILURE_BATCH_READY
+        wait_for: SUMMARIZER_DONE
+        timeout: 300
+      - id: propose
+        emit: GENERATE_REQUESTED
+        payload: {n: 10, source: failure_repair, mode: repair}
+        wait_for: BATCH_DONE
+        timeout: 900
+
+  crawl_then_summarize:
+    description: "Pull docs from a target → summarizer ingests → knowledge updated"
+    steps:
+      - id: crawl
+        emit: CRAWL_REQUESTED
+        wait_for: KNOWLEDGE_UPDATED
+        timeout: 1200
+      - id: summarize
+        emit: SUMMARIZER_DONE   # synthetic kick; summarizer self-pulls
+        timeout: 60
+
+tasks:
+
+  echo_task:
+    pipeline: echo_pipeline
+    description: "Smoke-test task — satisfies after 1 iteration"
+    goal:
+      iterations: {">=": 1}
+    max_iterations: 1
+    wall_time_secs: 60
+
+  daily_alpha_loop:
+    pipeline: alpha_round
+    description: "Submit at least 4 alphas (or 10 iterations max)"
+    goal:
+      or:
+        - {submitted_count: {">=": 4}}
+        - {iterations: {">=": 10}}
+    max_iterations: 10
+    wall_time_secs: 7200
+
+  failure_repair_session:
+    pipeline: failure_repair
+    description: "Run failure-driven repair until 2 alphas submit or 5 iters"
+    goal:
+      or:
+        - {submitted_count: {">=": 2}}
+        - {iterations: {">=": 5}}
+    max_iterations: 5
+    wall_time_secs: 3600
+
+  crawl_session:
+    pipeline: crawl_then_summarize
+    description: "One-shot crawl + summarize; satisfied after 1 successful run"
+    goal:
+      iterations: {">=": 1}
+    max_iterations: 3
+    wall_time_secs: 3600
+

@@ -14,10 +14,13 @@ from wq_bus.utils.logging import get_logger
 
 log = get_logger(__name__)
 
-_PROJECT_ROOT = Path(__file__).resolve().parents[3]
+from wq_bus.utils.paths import PROJECT_ROOT as _PROJECT_ROOT  # noqa: E402
 _CACHE_DIR = _PROJECT_ROOT / ".cache" / "pdfs"
 
 _OCR_THRESHOLD = 200  # chars; below this mark ocr_required
+# Cap downloaded PDF size to prevent zip-bomb / disk-exhaust attacks.
+# 50 MB is generous for academic PDFs (most are <5 MB); raise via env if needed.
+_MAX_PDF_SIZE = 50 * 1024 * 1024
 
 
 async def download_pdf(
@@ -46,6 +49,10 @@ async def download_pdf(
         log.debug("download_pdf cache hit %s", dest.name)
         return dest
 
+    # Honour robots.txt before issuing the GET (whitelisted WQ domains exempt).
+    from wq_bus.crawler.fetcher import _enforce_robots
+    await _enforce_robots(url)
+
     cookies: dict[str, Any] = {}
     if source:
         cookies = load_cookies(source) or {}
@@ -55,7 +62,26 @@ async def download_pdf(
     async with aiohttp.ClientSession(trust_env=False, headers=headers, cookies=cookies) as session:
         async with session.get(url, allow_redirects=True) as resp:
             resp.raise_for_status()
-            data = await resp.read()
+            # Reject oversize before reading: trust Content-Length when present.
+            cl = resp.content_length
+            if cl is not None and cl > _MAX_PDF_SIZE:
+                raise ValueError(
+                    f"download_pdf: refusing oversized PDF {url} "
+                    f"({cl} bytes > {_MAX_PDF_SIZE} cap)"
+                )
+            # Stream-read with a hard byte cap so a server lying about
+            # Content-Length still can't exhaust memory.
+            chunks: list[bytes] = []
+            received = 0
+            async for chunk in resp.content.iter_chunked(64 * 1024):
+                received += len(chunk)
+                if received > _MAX_PDF_SIZE:
+                    raise ValueError(
+                        f"download_pdf: PDF stream exceeded cap "
+                        f"({received} > {_MAX_PDF_SIZE}) for {url}"
+                    )
+                chunks.append(chunk)
+            data = b"".join(chunks)
 
     dest.write_bytes(data)
     log.info("download_pdf saved %s (%d bytes)", dest.name, len(data))

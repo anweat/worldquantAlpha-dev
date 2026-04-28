@@ -13,7 +13,7 @@ from wq_bus.agents.base import AgentBase
 from wq_bus.bus.events import Event, Topic, make_event
 from wq_bus.data import knowledge_db
 
-PROJECT_ROOT = Path(__file__).resolve().parents[3]
+from wq_bus.utils.paths import PROJECT_ROOT  # noqa: E402
 MEMORY_DIR = PROJECT_ROOT / "memory"
 
 
@@ -23,8 +23,14 @@ class FailureAnalyzer(AgentBase):
 
     async def on_batch_done(self, event: Event) -> None:
         tag = event.dataset_tag
-        # Dataset filtering is automatic: list_alphas uses require_tag() and
-        # event_bus wraps the handler in with_tag(event.dataset_tag).
+        # rev-h7: heavy candidate selection (near-miss vs hard, passing top,
+        # prior patterns, pool summary) is delegated to CuratedContext, which
+        # scores by recency / sharpe and diversifies by theme. We then assemble
+        # the AI payload from those curated buckets.
+        from wq_bus.ai.context_curator import CuratedContext
+
+        # Cheap pre-check: bail early if the batch produced zero failures, so
+        # we don't burn an AI call on an empty payload.
         all_alphas = knowledge_db.list_alphas(limit=300)
         failed = [a for a in all_alphas
                   if a["status"] not in ("submitted", "is_passed", "sc_passed")]
@@ -32,51 +38,24 @@ class FailureAnalyzer(AgentBase):
             self.log.info("batch_done: no failures to analyze for %s", tag)
             return
 
-        # Split: near-miss (sharpe>=0.8 but didn't pass) vs hard failures.
-        def _sharpe(a: dict) -> float:
-            try:
-                return float(a.get("sharpe") or 0.0)
-            except Exception:
-                return 0.0
+        curated = CuratedContext(agent_type="failure_analyzer", mode="batch_done", tag=tag).build()
 
-        near_miss = sorted(
-            [a for a in failed if _sharpe(a) >= 0.8],
-            key=_sharpe, reverse=True,
-        )[:20]
-        near_ids = {a["alpha_id"] for a in near_miss}
-        hard_failures = [a for a in failed if a["alpha_id"] not in near_ids][:30]
-
-        def _row(a: dict) -> dict:
-            return {
-                "expr": a["expression"][:200],
-                "sharpe": a.get("sharpe"),
-                "fitness": a.get("fitness"),
-                "turnover": a.get("turnover"),
-                "status": a["status"],
-            }
-
-        # Pull supporting context: prior summarised patterns (continuity),
-        # passing alphas in same dataset (positive comparison set per T3-A
-        # dim 1), and pool direction summary so AI can spot direction-level
-        # blind spots.
-        prior_patterns = self._load_prior_patterns(tag)
-        passing_top = self._top_passing(all_alphas)
-        pool_summary = self._pool_summary(tag)
-
-        payload = {
-            "dataset_tag": tag,
-            "n_total": event.payload.get("n_total"),
-            "n_is_passed": event.payload.get("n_is_passed"),
-            "failures": [_row(a) for a in hard_failures],
-            "near_miss": [_row(a) for a in near_miss],
-            "prior_patterns": prior_patterns,
-            "passing_top": passing_top,
-            "pool_summary": pool_summary,
-        }
         try:
-            result = await self.call_ai(payload, force_immediate=True)
+            result = await self.ai_request(
+                "failure_summary",
+                {
+                    "dataset_tag": tag,
+                    "failures": (curated.get("hard_failures", []) or []) +
+                                (curated.get("near_miss", []) or []),
+                    "existing_patterns": curated.get("prior_patterns", []),
+                },
+                timeout=300,
+            )
         except Exception as e:  # noqa: BLE001
             self.log.exception("failure_analyzer AI call failed: %s", e)
+            return
+        if result is None:
+            self.log.warning("failure_analyzer: AI returned no result, skipping")
             return
 
         summary = (result or {}).get("summary", "")

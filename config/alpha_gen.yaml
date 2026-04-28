@@ -1,0 +1,55 @@
+# alpha_gen.yaml — AlphaGen agent config
+#
+# expansion_factor (legacy, applies to the post-combiner step):
+#   Each combined alpha is programmatically expanded into K parameter-swept
+#   variants (window perturbation + settings rotation) by alpha_mutator.
+#   Range: 1 (no expansion) .. 8. Per-mode override available via
+#   mode_budgets.<mode>.expansion_factor below.
+#
+# mode_budgets:
+#   Per-alpha_gen-mode budget for the fragment + combiner pipeline.
+#     n_signals          — how many signal fragments AI should produce
+#     n_filters          — how many filter fragments AI should produce
+#     n_weights          — how many weight fragments AI should produce
+#     combos_per_signal  — how many combinations the combiner emits per signal
+#     expansion_factor   — passed to alpha_mutator.expand_batch on the combined
+#                          seeds (overrides the top-level expansion_factor)
+#     enabled_strategies — ordered list of combiner strategy names; controls
+#                          which assembly tactics run (see alpha_combiner.STRATEGIES).
+#                          Reserved for future plugins; current MVP supports:
+#                            "passthrough"  rank(signal) direct
+#                            "linear_2leg"  rank(A) + rank(B)
+#                            "filtered"     if_else(filter, rank(signal), 0)
+#                            "weighted"     weight * rank(signal)
+
+expansion_factor: 4
+
+mode_budgets:
+  explore:
+    n_signals: 20
+    n_filters: 4
+    n_weights: 2
+    combos_per_signal: 2
+    expansion_factor: 2
+    enabled_strategies: [passthrough, linear_2leg, filtered]
+  specialize:
+    n_signals: 8
+    n_filters: 3
+    n_weights: 2
+    combos_per_signal: 5
+    expansion_factor: 4
+    enabled_strategies: [passthrough, linear_2leg, filtered, weighted]
+  review_failure:
+    n_signals: 10
+    n_filters: 3
+    n_weights: 2
+    combos_per_signal: 3
+    expansion_factor: 3
+    enabled_strategies: [passthrough, filtered, weighted]
+  track_news:
+    n_signals: 12
+    n_filters: 4
+    n_weights: 2
+    combos_per_signal: 3
+    expansion_factor: 3
+    enabled_strategies: [passthrough, linear_2leg, filtered]

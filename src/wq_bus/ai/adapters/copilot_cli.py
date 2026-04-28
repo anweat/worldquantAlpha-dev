@@ -11,6 +11,15 @@ from wq_bus.utils.yaml_loader import load_yaml
 
 _log = get_logger(__name__)
 
+
+class ModelUnavailableError(RuntimeError):
+    """Raised when the Copilot CLI rejects a model (config / network).
+
+    Caught by dispatcher to retry with a fallback model instead of consuming
+    the per-round rate-cap on a non-recoverable provider error.
+    """
+    pass
+
 # ---------------------------------------------------------------------------
 # Probe: detect which flags the installed copilot CLI supports.
 # Run once at module import; cache forever in process.
@@ -174,6 +183,33 @@ class CopilotAdapter:
             # Empty stdout on non-zero exit → almost always a real error.
             # Non-empty stdout MAY still be usable, so return it but log loudly.
             if not stdout_text.strip():
+                # Classify error so dispatcher can pick a fallback model instead
+                # of burning the round-cap. Two kinds we care about:
+                #   1. Model unavailable (config / entitlement) — recoverable
+                #      by retrying with a default model the CLI definitely has.
+                #   2. Network unreachable (tunnel down for premium models) —
+                #      same recovery: fall back to a free model (gpt-5.4).
+                _stderr_low = stderr_text.lower()
+                _model_unavail = (
+                    "is not available" in _stderr_low
+                    or "model not found" in _stderr_low
+                    or "unknown model" in _stderr_low
+                )
+                _net_down = (
+                    "enotfound" in _stderr_low
+                    or "econnrefused" in _stderr_low
+                    or "etimedout" in _stderr_low
+                    or "could not connect" in _stderr_low
+                    or "network error" in _stderr_low
+                    or "fetch failed" in _stderr_low
+                    or "connect timeout" in _stderr_low
+                )
+                if _model_unavail or _net_down:
+                    raise ModelUnavailableError(
+                        f"Copilot CLI cannot use model={model!r} "
+                        f"({'unavailable' if _model_unavail else 'network'}). "
+                        f"stderr: {stderr_text}"
+                    )
                 raise RuntimeError(
                     f"Copilot CLI exited {proc.returncode} with empty stdout. "
                     f"stderr: {stderr_text}"

@@ -1,0 +1,66 @@
+# Summarizer agent config — R6-C
+#
+# 单 agent 多 mode；每个 mode 有独立的 cursor / 阈值 / 模型。
+# wake_interval 秒数（默认 300）后 agent 自检每个启用 mode 是否有 ≥ min_new
+# 条新数据要总结。完全 pull 模式，不依赖外部触发（解耦原则）。
+#
+# 调用统一走 AI 层 — emit AI_CALL_REQUESTED + 等待 AI_CALL_DONE。
+# 产出落盘到 memory/<scope>/<topic_subspace>/<mode>_<ts>.json，并 emit SUMMARIZER_DONE。
+
+enabled: true
+wake_interval_secs: 300
+cursor_path: memory/_global/_index/summarizer_cursors.json
+
+modes:
+
+  failure_summary:
+    enabled: true
+    prompt_kind: failure_summary
+    source: events                  # alpha_sim_errored + alpha_gen_errored
+    min_new: 10
+    retention_days: 60
+
+  crawl_doc_summary:
+    enabled: true
+    prompt_kind: crawl_doc_summary
+    source: crawl_docs              # crawl_docs WHERE state='pending'
+    min_new: 3
+    retention_days: 90
+
+  alpha_insight_extract:
+    enabled: true
+    prompt_kind: alpha_insight_extract
+    source: alphas_passed
+    min_new: 5
+    retention_days: 90
+
+  workspace_overview:
+    enabled: true                   # auto-fires when ≥min_new new crawl_summaries
+    prompt_kind: workspace_overview
+    source: composite
+    min_new: 6                      # ~30 docs at batch_threshold=5 → 6 partial summaries
+    min_hours_since_last: 6         # don't refine more than 4× per day
+    retention_days: 30
+
+  daily_summary:
+    enabled: true
+    prompt_kind: daily_summary
+    source: submitted_today
+    min_new: 1
+    min_hours_since_last: 12
+    retention_days: 365
+
+  longterm_summary_7d:
+    enabled: true
+    prompt_kind: longterm_summary_7d
+    source: summaries_weekly
+    min_new: 1
+    min_hours_since_last: 144       # ~6 days
+    retention_days: 365
+
+  diversity_analysis:
+    enabled: true
+    prompt_kind: diversity_analysis
+    source: alphas_passed
+    min_new: 3
+    retention_days: 30

@@ -11,7 +11,7 @@ from typing import Any
 
 import yaml
 
-_PROJECT_ROOT = Path(__file__).resolve().parents[3]
+from wq_bus.utils.paths import PROJECT_ROOT as _PROJECT_ROOT  # noqa: E402
 _SECRETS_DIR = _PROJECT_ROOT / ".secrets"
 _COOKIES_DIR = _SECRETS_DIR / "cookies"
 _ACCOUNTS_FILE = _SECRETS_DIR / "crawl_accounts.yaml"
